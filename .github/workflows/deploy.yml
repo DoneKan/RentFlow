@@ -1,0 +1,63 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: |
+          cd server && npm ci
+          cd ../client && npm ci
+
+      - name: Generate Prisma client
+        run: cd server && npx prisma generate
+
+      - name: Build client
+        run: cd client && npm run build
+        env:
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+          VITE_GOOGLE_MAPS_API_KEY: ${{ secrets.VITE_GOOGLE_MAPS_API_KEY }}
+          VITE_APP_NAME: RentFlow
+          VITE_DEFAULT_CURRENCY: UGX
+          VITE_DEFAULT_COUNTRY: UG
+
+      # Uncomment the deployment step matching your hosting provider:
+
+      # --- Railway (recommended) ---
+      # - name: Deploy to Railway
+      #   uses: bervProject/railway-deploy@main
+      #   with:
+      #     railway_token: ${{ secrets.RAILWAY_TOKEN }}
+      #     service: rentflow-api
+
+      # --- Render ---
+      # - name: Deploy to Render
+      #   run: |
+      #     curl -X POST "${{ secrets.RENDER_DEPLOY_HOOK }}"
+
+      # --- AWS (Elastic Beanstalk) ---
+      # - name: Deploy to AWS EB
+      #   uses: einaregilsson/beanstalk-deploy@v22
+      #   with:
+      #     aws_access_key: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      #     aws_secret_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      #     application_name: rentflow
+      #     environment_name: rentflow-prod
+      #     region: af-south-1
+      #     version_label: ${{ github.sha }}
+
+      - name: Notify success
+        run: echo "Deployment pipeline complete for commit ${{ github.sha }}"

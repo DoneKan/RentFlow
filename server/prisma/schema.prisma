@@ -1,0 +1,264 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Organization {
+  id                 String    @id @default(cuid())
+  name               String
+  type               String    @default("INDIVIDUAL")
+  registrationNumber String?
+  email              String?
+  phone              String?
+  address            String?
+  city               String?
+  country            String    @default("UG")
+  currency           String    @default("UGX")
+  logoUrl            String?
+  plan               String    @default("FREE")
+  planExpiresAt      DateTime?
+  isActive           Boolean   @default(true)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  users      User[]
+  properties Property[]
+
+  @@map("organizations")
+}
+
+model User {
+  id             String   @id @default(cuid())
+  email          String   @unique
+  password       String
+  name           String
+  phone          String?
+  role           String   @default("TENANT")
+  organizationId String?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization        Organization?        @relation(fields: [organizationId], references: [id])
+  managedProperties   Property[]           @relation("PropertyManager")
+  tenantProfile       Tenancy[]            @relation("TenantUser")
+  invoices            Invoice[]            @relation("TenantInvoices")
+  payments            Payment[]            @relation("TenantPayments")
+  notifications       Notification[]
+  maintenanceRequests MaintenanceRequest[] @relation("TenantMaintenance")
+
+  @@index([email])
+  @@index([organizationId])
+  @@map("users")
+}
+
+model Property {
+  id             String   @id @default(cuid())
+  code           String   @unique
+  name           String
+  type           String   @default("RESIDENTIAL")
+  description    String?
+  address        String
+  city           String
+  district       String?
+  country        String   @default("UG")
+  latitude       Float?
+  longitude      Float?
+  amenities      String   @default("[]")
+  managerId      String
+  organizationId String
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  manager      User         @relation("PropertyManager", fields: [managerId], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id])
+  units        Unit[]
+  expenses     Expense[]
+  tenancies    Tenancy[]
+  invoices     Invoice[]
+  maintenanceRequests MaintenanceRequest[]
+
+  @@index([organizationId])
+  @@index([code])
+  @@map("properties")
+}
+
+model Unit {
+  id                String   @id @default(cuid())
+  propertyId        String
+  unitNumber        String
+  floor             Int?
+  type              String   @default("1-bedroom")
+  bedrooms          Int      @default(1)
+  bathrooms         Int      @default(1)
+  squareMeters      Float?
+  rentAmount        Decimal
+  currency          String   @default("UGX")
+  additionalCharges String   @default("{}")
+  paymentPeriod     String   @default("MONTHLY")
+  status            String   @default("VACANT")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  property            Property             @relation(fields: [propertyId], references: [id])
+  tenancy             Tenancy?
+  invoices            Invoice[]
+  maintenanceRequests MaintenanceRequest[]
+
+  @@unique([propertyId, unitNumber])
+  @@index([propertyId])
+  @@index([status])
+  @@map("units")
+}
+
+model Tenancy {
+  id            String    @id @default(cuid())
+  unitId        String    @unique
+  tenantId      String
+  propertyId    String
+  startDate     DateTime
+  endDate       DateTime?
+  rentAmount    Decimal
+  depositAmount Decimal   @default(0)
+  status        String    @default("ACTIVE")
+  notes         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  unit                Unit                 @relation(fields: [unitId], references: [id])
+  tenant              User                 @relation("TenantUser", fields: [tenantId], references: [id])
+  property            Property             @relation(fields: [propertyId], references: [id])
+  invoices            Invoice[]
+  maintenanceRequests MaintenanceRequest[]
+
+  @@index([tenantId])
+  @@index([propertyId])
+  @@index([status])
+  @@map("tenancies")
+}
+
+model Invoice {
+  id            String    @id @default(cuid())
+  invoiceNumber String    @unique
+  tenancyId     String
+  unitId        String
+  propertyId    String
+  tenantId      String
+  amount        Decimal
+  currency      String    @default("UGX")
+  dueDate       DateTime
+  items         String
+  latePenalty   Decimal   @default(0)
+  status        String    @default("DRAFT")
+  sentAt        DateTime?
+  paidAt        DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  tenancy  Tenancy   @relation(fields: [tenancyId], references: [id])
+  unit     Unit      @relation(fields: [unitId], references: [id])
+  property Property  @relation(fields: [propertyId], references: [id])
+  tenant   User      @relation("TenantInvoices", fields: [tenantId], references: [id])
+  payments Payment[]
+
+  @@index([tenancyId])
+  @@index([tenantId])
+  @@index([propertyId])
+  @@index([status])
+  @@index([dueDate])
+  @@map("invoices")
+}
+
+model Payment {
+  id            String    @id @default(cuid())
+  invoiceId     String
+  tenantId      String
+  amount        Decimal
+  currency      String    @default("UGX")
+  method        String
+  transactionId String?
+  mobileNumber  String?
+  status        String    @default("PENDING")
+  receiptNumber String    @unique
+  receiptUrl    String?
+  notes         String?
+  paidAt        DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id])
+  tenant  User    @relation("TenantPayments", fields: [tenantId], references: [id])
+
+  @@index([invoiceId])
+  @@index([tenantId])
+  @@index([status])
+  @@map("payments")
+}
+
+model Expense {
+  id          String   @id @default(cuid())
+  propertyId  String
+  category    String   @default("OTHER")
+  amount      Decimal
+  currency    String   @default("UGX")
+  description String
+  date        DateTime
+  receiptUrl  String?
+  vendor      String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  property Property @relation(fields: [propertyId], references: [id])
+
+  @@index([propertyId])
+  @@index([category])
+  @@index([date])
+  @@map("expenses")
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String
+  title     String
+  message   String
+  isRead    Boolean  @default(false)
+  data      String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([isRead])
+  @@map("notifications")
+}
+
+model MaintenanceRequest {
+  id          String    @id @default(cuid())
+  tenancyId   String
+  unitId      String
+  propertyId  String
+  tenantId    String
+  title       String
+  description String
+  priority    String    @default("MEDIUM")
+  status      String    @default("OPEN")
+  resolvedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  tenancy  Tenancy  @relation(fields: [tenancyId], references: [id])
+  unit     Unit     @relation(fields: [unitId], references: [id])
+  property Property @relation(fields: [propertyId], references: [id])
+  tenant   User     @relation("TenantMaintenance", fields: [tenantId], references: [id])
+
+  @@index([propertyId])
+  @@index([tenantId])
+  @@index([status])
+  @@map("maintenance_requests")
+}

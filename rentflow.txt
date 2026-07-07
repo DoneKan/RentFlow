@@ -1,0 +1,3 @@
+- Admin: admin@rentflow.ug / Admin@1234
+- Manager: manager@rentflow.ug / Manager@1234
+- Tenant: tenant@rentflow.ug / Tenant@1234
