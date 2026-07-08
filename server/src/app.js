@@ -26,6 +26,9 @@ const notificationRoutes = require('./routes/notification.routes');
 const prisma = new PrismaClient();
 const app = express();
 
+// Trust Railway's proxy so express-rate-limit can read X-Forwarded-For correctly
+app.set('trust proxy', 1);
+
 // Security
 app.use(helmet());
 const allowedOrigins = (process.env.CLIENT_URL || 'http://localhost:5173')
