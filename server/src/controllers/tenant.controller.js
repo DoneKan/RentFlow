@@ -234,4 +234,37 @@ async function terminate(req, res, next) {
   }
 }
 
-module.exports = { list, create, getOne, update, terminate };
+async function getMyPortal(req, res, next) {
+  try {
+    const tenancy = await prisma.tenancy.findFirst({
+      where: { tenantId: req.user.id, status: 'ACTIVE' },
+      include: {
+        unit: true,
+        property: {
+          select: {
+            id: true, name: true, code: true, address: true, city: true,
+            organization: { select: { name: true, phone: true, email: true, currency: true } },
+          },
+        },
+        invoices: {
+          orderBy: { createdAt: 'desc' },
+          take: 12,
+          include: { payments: true },
+        },
+      },
+    });
+
+    if (!tenancy) throw ApiError.notFound('No active tenancy found');
+
+    const invoices = tenancy.invoices.map((inv) => ({
+      ...inv,
+      items: (() => { try { return JSON.parse(inv.items); } catch { return []; } })(),
+    }));
+
+    return ApiResponse.success(res, { ...tenancy, invoices });
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { list, create, getOne, update, terminate, getMyPortal };

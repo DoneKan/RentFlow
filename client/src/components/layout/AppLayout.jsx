@@ -14,24 +14,34 @@ import {
   X,
   ChevronDown,
   User,
+  Wrench,
+  Home,
 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { getInitials } from '../../utils/formatters'
 import NotificationDropdown from '../notifications/NotificationDropdown'
 
-const NAV_ITEMS = [
+const MANAGER_NAV = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/properties', icon: Building2, label: 'Properties' },
   { to: '/tenants', icon: Users, label: 'Tenants' },
   { to: '/invoices', icon: FileText, label: 'Invoices' },
   { to: '/payments', icon: CreditCard, label: 'Payments' },
   { to: '/expenses', icon: Receipt, label: 'Expenses' },
+  { to: '/maintenance', icon: Wrench, label: 'Maintenance' },
   { to: '/reports', icon: BarChart3, label: 'Reports' },
+  { to: '/settings', icon: Settings, label: 'Settings' },
+]
+
+const TENANT_NAV = [
+  { to: '/portal', icon: Home, label: 'My Home' },
   { to: '/settings', icon: Settings, label: 'Settings' },
 ]
 
 function Sidebar({ onClose }) {
   const { user, logout } = useAuth()
+  const isTenant = user?.role === 'TENANT'
+  const navItems = isTenant ? TENANT_NAV : MANAGER_NAV
 
   return (
     <div className="flex h-full flex-col bg-brand text-white w-64">
@@ -41,7 +51,9 @@ function Sidebar({ onClose }) {
             <span className="text-2xl">🏠</span>
             <span className="text-xl font-bold tracking-tight">RentFlow</span>
           </div>
-          <p className="text-[11px] text-white/50 mt-0.5 ml-8">Property Management</p>
+          <p className="text-[11px] text-white/50 mt-0.5 ml-8">
+            {isTenant ? 'Tenant Portal' : 'Property Management'}
+          </p>
         </div>
         {onClose && (
           <button onClick={onClose} className="lg:hidden text-white/60 hover:text-white">
@@ -51,7 +63,7 @@ function Sidebar({ onClose }) {
       </div>
 
       <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-0.5">
-        {NAV_ITEMS.map(({ to, icon: Icon, label }) => (
+        {navItems.map(({ to, icon: Icon, label }) => (
           <NavLink
             key={to}
             to={to}

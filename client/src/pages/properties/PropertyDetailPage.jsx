@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Edit2, Building2, MapPin, Pencil, Plus, UserPlus } from 'lucide-react'
+import { ArrowLeft, Edit2, Building2, MapPin, Pencil, Plus, UserPlus, Wrench } from 'lucide-react'
 import { useProperty, usePropertyUnits } from '../../hooks/useProperties'
 import { formatCurrency } from '../../utils/formatters'
 import StatusBadge from '../../components/ui/StatusBadge'
@@ -13,13 +13,21 @@ import EmptyState from '../../components/ui/EmptyState'
 import { useExpenses } from '../../hooks/useExpenses'
 import LogExpenseForm from '../../components/forms/LogExpenseForm'
 import { formatDate } from '../../utils/formatters'
+import { useMaintenance } from '../../hooks/useMaintenance'
 
-const TABS = ['Overview', 'Units', 'Expenses']
+const TABS = ['Units', 'Overview', 'Expenses', 'Maintenance']
+
+const PRIORITY_COLORS = {
+  LOW: 'bg-gray-100 text-gray-600',
+  MEDIUM: 'bg-yellow-100 text-yellow-700',
+  HIGH: 'bg-orange-100 text-orange-700',
+  URGENT: 'bg-red-100 text-red-700',
+}
 
 export default function PropertyDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const [activeTab, setActiveTab] = useState('Overview')
+  const [activeTab, setActiveTab] = useState('Units')
   const [showAddUnit, setShowAddUnit] = useState(false)
   const [showAddTenant, setShowAddTenant] = useState(false)
   const [selectedUnitId, setSelectedUnitId] = useState(null)
@@ -28,9 +36,11 @@ export default function PropertyDetailPage() {
   const { data: property, isLoading } = useProperty(id)
   const { data: unitsData, isLoading: unitsLoading } = usePropertyUnits(id)
   const { data: expensesData, isLoading: expensesLoading } = useExpenses({ propertyId: id })
+  const { data: maintenanceData } = useMaintenance({ propertyId: id })
 
   const units = unitsData?.units || []
   const expenses = expensesData?.expenses || []
+  const maintenanceRequests = maintenanceData?.data || []
 
   if (isLoading) return <LoadingSpinner fullPage />
   if (!property) return <div className="text-center py-20 text-gray-500">Property not found</div>
@@ -178,6 +188,30 @@ export default function PropertyDetailPage() {
             </button>
           </div>
           <DataTable columns={expenseCols} data={expenses} loading={expensesLoading} emptyMessage="No expenses logged for this property" />
+        </div>
+      )}
+
+      {activeTab === 'Maintenance' && (
+        <div className="space-y-3">
+          {maintenanceRequests.length === 0 && (
+            <div className="text-center py-12 text-gray-400">
+              <Wrench className="h-8 w-8 mx-auto mb-2 opacity-40" />
+              <p className="text-sm">No maintenance requests for this property</p>
+            </div>
+          )}
+          {maintenanceRequests.map((r) => (
+            <div key={r.id} className="bg-white rounded-xl border border-gray-100 p-4 flex items-start justify-between gap-4">
+              <div className="flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="font-medium text-sm">{r.title}</p>
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${PRIORITY_COLORS[r.priority]}`}>{r.priority}</span>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">{r.description}</p>
+                <p className="text-xs text-gray-400 mt-1">Unit {r.unit?.unitNumber} · {r.tenant?.name}</p>
+              </div>
+              <StatusBadge status={r.status} />
+            </div>
+          ))}
         </div>
       )}
 

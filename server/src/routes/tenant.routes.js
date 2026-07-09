@@ -27,6 +27,7 @@ const updateSchema = Joi.object({
   notes: Joi.string().allow('', null),
 });
 
+router.get('/portal/me', authenticate, controller.getMyPortal);
 router.get('/', authenticate, controller.list);
 router.post('/', authenticate, authorize('SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'LANDLORD'), validate(createSchema), controller.create);
 router.get('/:id', authenticate, controller.getOne);

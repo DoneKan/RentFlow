@@ -22,6 +22,7 @@ const paymentRoutes = require('./routes/payment.routes');
 const expenseRoutes = require('./routes/expense.routes');
 const reportRoutes = require('./routes/report.routes');
 const notificationRoutes = require('./routes/notification.routes');
+const maintenanceRoutes = require('./routes/maintenance.routes');
 
 const prisma = new PrismaClient();
 const app = express();
@@ -90,6 +91,7 @@ app.use(`${API}/payments`, paymentRoutes);
 app.use(`${API}/expenses`, expenseRoutes);
 app.use(`${API}/reports`, reportRoutes);
 app.use(`${API}/notifications`, notificationRoutes);
+app.use(`${API}/maintenance`, maintenanceRoutes);
 
 // 404 handler
 app.use((req, res, next) => {

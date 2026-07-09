@@ -1,5 +1,5 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
-import { AuthProvider } from './context/AuthContext'
+import { AuthProvider, useAuth } from './context/AuthContext'
 import AppLayout from './components/layout/AppLayout'
 import ProtectedRoute from './components/layout/ProtectedRoute'
 
@@ -17,17 +17,23 @@ import ExpensesPage from './pages/expenses/ExpensesPage'
 import ReportsPage from './pages/reports/ReportsPage'
 import SettingsPage from './pages/settings/SettingsPage'
 import ProfilePage from './pages/settings/ProfilePage'
+import MaintenancePage from './pages/maintenance/MaintenancePage'
+import TenantPortalPage from './pages/tenant/TenantPortalPage'
 import NotFoundPage from './pages/NotFoundPage'
+
+function RootRedirect() {
+  const { user } = useAuth()
+  if (user?.role === 'TENANT') return <Navigate to="/portal" replace />
+  return <Navigate to="/dashboard" replace />
+}
 
 export default function App() {
   return (
     <AuthProvider>
       <Routes>
-        {/* Public routes */}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
 
-        {/* Protected routes */}
         <Route
           element={
             <ProtectedRoute>
@@ -35,7 +41,12 @@ export default function App() {
             </ProtectedRoute>
           }
         >
-          <Route index element={<Navigate to="/dashboard" replace />} />
+          <Route index element={<RootRedirect />} />
+
+          {/* Tenant-only portal */}
+          <Route path="/portal" element={<TenantPortalPage />} />
+
+          {/* Manager / Admin routes */}
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/properties" element={<PropertiesPage />} />
           <Route path="/properties/:id" element={<PropertyDetailPage />} />
@@ -46,6 +57,7 @@ export default function App() {
           <Route path="/payments" element={<PaymentsPage />} />
           <Route path="/expenses" element={<ExpensesPage />} />
           <Route path="/reports" element={<ReportsPage />} />
+          <Route path="/maintenance" element={<MaintenancePage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/profile" element={<ProfilePage />} />
         </Route>
