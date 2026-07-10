@@ -3,48 +3,60 @@ import { Plus, Trash2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useQuery } from '@tanstack/react-query'
 import { useCreateInvoice } from '../../hooks/useInvoices'
-import { getTenants } from '../../services/tenant.service'
-import { getTenant } from '../../services/tenant.service'
+import { getTenants, getTenant } from '../../services/tenant.service'
 import { formatCurrency } from '../../utils/formatters'
-import { addMonths, addDays, format } from 'date-fns'
+import { addDays, format } from 'date-fns'
 
 export default function GenerateInvoiceForm({ onClose, defaultTenantId }) {
   const create = useCreateInvoice()
-  const [tenantId, setTenantId] = useState(defaultTenantId || '')
+  // tenancyId is the selected tenancy ID (what the API expects)
+  const [tenancyId, setTenancyId] = useState('')
   const [dueDate, setDueDate] = useState(format(addDays(new Date(), 7), 'yyyy-MM-dd'))
   const [latePenalty, setLatePenalty] = useState('')
   const [notes, setNotes] = useState('')
   const [items, setItems] = useState([])
 
-  const { data: tenantsData } = useQuery({
+  // Tenant list returns tenancies
+  const { data: tenancies } = useQuery({
     queryKey: ['tenants'],
     queryFn: getTenants,
-    select: (r) => r.data?.tenants || [],
+    select: (r) => r.data?.data || [],
   })
 
-  const { data: tenantData } = useQuery({
-    queryKey: ['tenant', tenantId],
-    queryFn: () => getTenant(tenantId),
+  // If defaultTenantId is a USER ID, find the matching tenancy
+  useEffect(() => {
+    if (defaultTenantId && tenancies?.length) {
+      const match = tenancies.find((t) => t.tenantId === defaultTenantId || t.id === defaultTenantId)
+      if (match) setTenancyId(match.id)
+    }
+  }, [defaultTenantId, tenancies])
+
+  // Fetch tenancy detail to auto-build items
+  const { data: tenancyData } = useQuery({
+    queryKey: ['tenant', tenancyId],
+    queryFn: () => getTenant(tenancyId),
     select: (r) => r.data,
-    enabled: !!tenantId,
+    enabled: !!tenancyId,
   })
 
   useEffect(() => {
-    if (tenantData?.tenancy?.unit) {
-      const unit = tenantData.tenancy.unit
-      const baseItems = [{ description: `Rent — ${unit.unitNumber} (${unit.type})`, amount: parseFloat(unit.rentAmount) }]
-      if (unit.additionalCharges) {
-        Object.entries(unit.additionalCharges).forEach(([k, v]) => {
-          baseItems.push({ description: k, amount: parseFloat(v) })
-        })
-      }
+    if (tenancyData?.unit) {
+      const unit = tenancyData.unit
+      const charges = typeof unit.additionalCharges === 'string'
+        ? JSON.parse(unit.additionalCharges || '{}')
+        : (unit.additionalCharges || {})
+      const baseItems = [
+        { description: `Rent — ${unit.unitNumber} (${unit.type})`, amount: parseFloat(unit.rentAmount) },
+      ]
+      Object.entries(charges).forEach(([k, v]) => {
+        if (v) baseItems.push({ description: k.charAt(0).toUpperCase() + k.slice(1), amount: parseFloat(v) })
+      })
       setItems(baseItems)
     }
-  }, [tenantData])
+  }, [tenancyData])
 
-  const updateItem = (i, field, value) => {
+  const updateItem = (i, field, value) =>
     setItems((prev) => prev.map((item, idx) => idx === i ? { ...item, [field]: value } : item))
-  }
 
   const addItem = () => setItems((p) => [...p, { description: '', amount: 0 }])
   const removeItem = (i) => setItems((p) => p.filter((_, idx) => idx !== i))
@@ -53,15 +65,14 @@ export default function GenerateInvoiceForm({ onClose, defaultTenantId }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    if (!tenantId) { toast.error('Please select a tenant'); return }
+    if (!tenancyId) { toast.error('Please select a tenant'); return }
     if (items.length === 0) { toast.error('Add at least one invoice item'); return }
     try {
       await create.mutateAsync({
-        tenantId,
+        tenancyId,
         dueDate,
         latePenalty: latePenalty ? parseFloat(latePenalty) : 0,
-        notes,
-        items: items.map((i) => ({ ...i, amount: parseFloat(i.amount) || 0 })),
+        customItems: items.map((i) => ({ ...i, amount: parseFloat(i.amount) || 0 })),
       })
       toast.success('Invoice generated!')
       onClose()
@@ -74,10 +85,12 @@ export default function GenerateInvoiceForm({ onClose, defaultTenantId }) {
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
         <label className="label">Tenant *</label>
-        <select value={tenantId} onChange={(e) => setTenantId(e.target.value)} className="input" required>
+        <select value={tenancyId} onChange={(e) => setTenancyId(e.target.value)} className="input" required>
           <option value="">Select tenant…</option>
-          {(tenantsData || []).map((t) => (
-            <option key={t.id} value={t.userId || t.id}>{t.name || t.user?.name}</option>
+          {(tenancies || []).map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.tenant?.name} — {t.property?.name} Unit {t.unit?.unitNumber}
+            </option>
           ))}
         </select>
       </div>
@@ -115,6 +128,14 @@ export default function GenerateInvoiceForm({ onClose, defaultTenantId }) {
           <div className="mt-2 flex justify-end">
             <span className="text-sm font-semibold text-gray-900">Total: {formatCurrency(total)}</span>
           </div>
+        </div>
+      )}
+
+      {tenancyId && items.length === 0 && (
+        <div className="text-center py-3">
+          <button type="button" onClick={addItem} className="text-sm text-brand hover:underline">
+            + Add invoice item manually
+          </button>
         </div>
       )}
 

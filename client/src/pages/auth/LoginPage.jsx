@@ -24,8 +24,8 @@ export default function LoginPage() {
     }
     setLoading(true)
     try {
-      await login(form.email, form.password)
-      navigate('/dashboard')
+      const userData = await login(form.email, form.password)
+      navigate(userData.role === 'TENANT' ? '/portal' : '/dashboard')
     } catch (err) {
       toast.error(err.response?.data?.message || 'Invalid email or password')
     } finally {

@@ -25,13 +25,13 @@ export default function RecordPaymentForm({ onClose, defaultTenantId, defaultInv
   const { data: tenantsData } = useQuery({
     queryKey: ['tenants'],
     queryFn: getTenants,
-    select: (r) => r.data?.tenants || [],
+    select: (r) => r.data?.data || [],
   })
 
   const { data: invoicesData } = useQuery({
     queryKey: ['invoices', { tenantId: form.tenantId, status: 'SENT,OVERDUE' }],
-    queryFn: () => getInvoices({ tenantId: form.tenantId, status: 'SENT,OVERDUE' }),
-    select: (r) => r.data?.invoices || [],
+    queryFn: () => getInvoices({ tenantId: form.tenantId }),
+    select: (r) => r.data?.data?.filter((i) => ['SENT', 'OVERDUE'].includes(i.status)) || [],
     enabled: !!form.tenantId,
   })
 
@@ -75,7 +75,7 @@ export default function RecordPaymentForm({ onClose, defaultTenantId, defaultInv
         <select value={form.tenantId} onChange={handleTenantChange} className="input" required>
           <option value="">Select tenant…</option>
           {(tenantsData || []).map((t) => (
-            <option key={t.id} value={t.userId || t.id}>{t.name || t.user?.name}</option>
+            <option key={t.id} value={t.tenantId}>{t.tenant?.name} — {t.property?.name}</option>
           ))}
         </select>
       </div>

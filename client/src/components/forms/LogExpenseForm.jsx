@@ -23,7 +23,7 @@ export default function LogExpenseForm({ onClose, defaultPropertyId }) {
   const { data: propertiesData } = useQuery({
     queryKey: ['properties'],
     queryFn: getProperties,
-    select: (r) => r.data?.properties || [],
+    select: (r) => r.data?.data || [],
   })
 
   const handleSubmit = async (e) => {
