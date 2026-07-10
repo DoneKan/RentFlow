@@ -21,6 +21,11 @@ export default function AddTenantForm({ onClose, defaultPropertyId }) {
     rentAmount: '',
     depositAmount: '',
     paymentPeriod: 'MONTHLY',
+    lateFeePercent: '10',
+    gracePeriodDays: '5',
+    noticePeriodDays: '30',
+    petPolicy: 'NOT_ALLOWED',
+    termsAgreed: false,
     notes: '',
   })
 
@@ -52,6 +57,7 @@ export default function AddTenantForm({ onClose, defaultPropertyId }) {
       if (!form.propertyId || !form.unitId) { toast.error('Please select a property and unit'); return false }
     } else if (step === 2) {
       if (!form.startDate || !form.rentAmount) { toast.error('Start date and rent amount are required'); return false }
+      if (!form.termsAgreed) { toast.error('Please agree to the tenancy terms to proceed'); return false }
     }
     return true
   }
@@ -63,10 +69,20 @@ export default function AddTenantForm({ onClose, defaultPropertyId }) {
     e.preventDefault()
     if (!validateStep()) return
     try {
+      const notes = [
+        `Late fee: ${form.lateFeePercent}% after ${form.gracePeriodDays}-day grace period`,
+        `Notice period: ${form.noticePeriodDays} days`,
+        `Pet policy: ${form.petPolicy.replace('_', ' ').toLowerCase()}`,
+        form.notes ? `Notes: ${form.notes}` : '',
+      ].filter(Boolean).join(' | ')
+
       await create.mutateAsync({
-        ...form,
+        name: form.name, email: form.email, phone: form.phone,
+        propertyId: form.propertyId, unitId: form.unitId,
+        startDate: form.startDate, paymentPeriod: form.paymentPeriod,
         rentAmount: parseFloat(form.rentAmount),
         depositAmount: form.depositAmount ? parseFloat(form.depositAmount) : 0,
+        notes,
       })
       toast.success('Tenant added successfully!')
       onClose()
@@ -172,10 +188,49 @@ export default function AddTenantForm({ onClose, defaultPropertyId }) {
                 <input type="number" value={form.depositAmount} onChange={(e) => set('depositAmount', e.target.value)} className="input" placeholder="0" />
               </div>
             </div>
-            <div>
-              <label className="label">Notes</label>
-              <textarea value={form.notes} onChange={(e) => set('notes', e.target.value)} className="input h-16 resize-none" placeholder="Any special terms or notes…" />
+
+            <div className="border-t border-gray-100 pt-4">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Lease Policy</p>
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="label">Late fee %</label>
+                  <input type="number" min="0" max="50" value={form.lateFeePercent} onChange={(e) => set('lateFeePercent', e.target.value)} className="input" placeholder="10" />
+                </div>
+                <div>
+                  <label className="label">Grace period (days)</label>
+                  <input type="number" min="0" max="30" value={form.gracePeriodDays} onChange={(e) => set('gracePeriodDays', e.target.value)} className="input" placeholder="5" />
+                </div>
+                <div>
+                  <label className="label">Notice period (days)</label>
+                  <input type="number" min="0" max="90" value={form.noticePeriodDays} onChange={(e) => set('noticePeriodDays', e.target.value)} className="input" placeholder="30" />
+                </div>
+              </div>
+              <div className="mt-3">
+                <label className="label">Pet policy</label>
+                <select value={form.petPolicy} onChange={(e) => set('petPolicy', e.target.value)} className="input">
+                  <option value="NOT_ALLOWED">No pets allowed</option>
+                  <option value="ALLOWED">Pets allowed</option>
+                  <option value="ALLOWED_WITH_DEPOSIT">Pets allowed with extra deposit</option>
+                </select>
+              </div>
             </div>
+
+            <div>
+              <label className="label">Additional notes</label>
+              <textarea value={form.notes} onChange={(e) => set('notes', e.target.value)} className="input h-14 resize-none" placeholder="Any special terms or notes…" />
+            </div>
+
+            <label className="flex items-start gap-3 p-3 rounded-lg border border-gray-200 cursor-pointer hover:border-brand transition-colors">
+              <input
+                type="checkbox"
+                checked={form.termsAgreed}
+                onChange={(e) => set('termsAgreed', e.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-gray-300 text-brand accent-brand"
+              />
+              <span className="text-xs text-gray-600 leading-relaxed">
+                I confirm that the tenant has read and agreed to the tenancy terms, including rent payment schedule, late fee policy, notice period requirements, and occupancy rules as stated above.
+              </span>
+            </label>
           </div>
         )}
 

@@ -8,5 +8,6 @@ router.get('/dashboard', authenticate, controller.dashboard);
 router.get('/monthly', authenticate, controller.monthly);
 router.get('/property/:id', authenticate, controller.propertyReport);
 router.get('/export', authenticate, authorize('SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'LANDLORD'), controller.exportReport);
+router.get('/subscription', authenticate, controller.subscription);
 
 module.exports = router;

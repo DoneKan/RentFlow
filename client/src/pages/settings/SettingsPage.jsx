@@ -1,9 +1,11 @@
-﻿import { useState } from 'react'
-import { Building2, CreditCard, Bell, AlertTriangle, Check } from 'lucide-react'
+import { useState } from 'react'
+import { Building2, CreditCard, Bell, AlertTriangle, Check, TrendingUp } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '../../context/AuthContext'
 import PageHeader from '../../components/ui/PageHeader'
 import ConfirmDialog from '../../components/ui/ConfirmDialog'
+import api from '../../services/api'
 
 function Toggle({ enabled, onChange }) {
   return (
@@ -27,29 +29,61 @@ const TABS = [
 const PLANS = [
   {
     id: 'FREE',
-    name: 'Free',
+    name: 'Starter',
     price: 'UGX 0',
     period: '/month',
-    features: ['1 property', 'Basic rent tracking', 'Basic reminders', 'Up to 5 tenants'],
+    unitLimit: 5,
+    features: ['1 property', 'Up to 5 units', 'Rent tracking & invoicing', 'Tenant portal', 'Basic reports'],
     badge: null,
+    color: 'gray',
   },
   {
-    id: 'STANDARD',
-    name: 'Standard',
-    price: 'UGX 50,000',
+    id: 'GROWTH',
+    name: 'Growth',
+    price: 'UGX 75,000',
     period: '/month',
-    features: ['Up to 10 properties', 'Full features', 'Monthly reports', 'PDF receipts', 'Email & SMS reminders', 'Priority support'],
+    unitLimit: 30,
+    features: ['Up to 10 properties', 'Up to 30 units', 'Full invoicing & payments', 'Maintenance requests', 'Monthly reports & CSV export', 'Email reminders'],
     badge: 'Popular',
+    color: 'brand',
   },
   {
-    id: 'PREMIUM',
-    name: 'Premium',
-    price: 'UGX 150,000',
+    id: 'BUSINESS',
+    name: 'Business',
+    price: 'UGX 180,000',
     period: '/month',
-    features: ['Unlimited properties', 'Advanced analytics', 'Multi-manager access', 'API access', 'Custom branding', 'Priority support'],
+    unitLimit: 100,
+    features: ['Up to 50 properties', 'Up to 100 units', 'All Growth features', 'Advanced analytics', 'Multi-manager access', 'PDF receipts', 'Priority support'],
     badge: null,
+    color: 'purple',
+  },
+  {
+    id: 'ENTERPRISE',
+    name: 'Enterprise',
+    price: 'UGX 400,000',
+    period: '/month',
+    unitLimit: Infinity,
+    features: ['Unlimited properties', 'Unlimited units', 'All Business features', 'Custom branding', 'Dedicated account manager', 'SLA guarantee', 'API access'],
+    badge: null,
+    color: 'indigo',
   },
 ]
+
+function UsageBar({ label, used, limit }) {
+  const pct = limit === Infinity ? 0 : Math.min(100, Math.round((used / limit) * 100))
+  const color = pct >= 90 ? 'bg-red-500' : pct >= 70 ? 'bg-yellow-500' : 'bg-green-500'
+  return (
+    <div>
+      <div className="flex justify-between text-xs text-gray-500 mb-1">
+        <span>{label}</span>
+        <span className="font-medium">{used} / {limit === Infinity ? '∞' : limit}</span>
+      </div>
+      <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+        <div className={`h-full rounded-full transition-all ${color}`} style={{ width: limit === Infinity ? '10%' : `${pct}%` }} />
+      </div>
+    </div>
+  )
+}
 
 export default function SettingsPage() {
   const { user } = useAuth()
@@ -65,7 +99,15 @@ export default function SettingsPage() {
     monthlyReports: true,
   })
 
-  const currentPlan = user?.organization?.plan || 'FREE'
+  const { data: subData } = useQuery({
+    queryKey: ['subscription'],
+    queryFn: () => api.get('/reports/subscription'),
+    select: (r) => r.data?.data,
+    enabled: activeTab === 'subscription',
+  })
+
+  const currentPlanId = subData?.plan || user?.organization?.plan || 'FREE'
+  const currentPlan = PLANS.find((p) => p.id === currentPlanId) || PLANS[0]
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -105,7 +147,7 @@ export default function SettingsPage() {
               { label: 'Phone', value: user?.organization?.phone || '—' },
               { label: 'Country', value: user?.organization?.country || 'UG' },
               { label: 'Currency', value: user?.organization?.currency || 'UGX' },
-              { label: 'Plan', value: user?.organization?.plan || 'FREE' },
+              { label: 'Plan', value: currentPlan.name },
             ].map(({ label, value }) => (
               <div key={label} className="bg-gray-50 rounded-lg px-4 py-3">
                 <p className="text-xs text-gray-500 mb-0.5">{label}</p>
@@ -123,20 +165,43 @@ export default function SettingsPage() {
 
       {activeTab === 'subscription' && (
         <div className="space-y-6">
+          {/* Current usage */}
           <div className="card">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between mb-4">
               <div>
                 <h2 className="text-base font-semibold text-gray-900">Current Plan</h2>
-                <p className="text-sm text-gray-500 mt-1">You are on the <span className="font-semibold text-brand">{currentPlan}</span> plan.</p>
+                <p className="text-sm text-gray-500 mt-0.5">
+                  You are on the <span className="font-semibold text-brand">{currentPlan.name}</span> plan.
+                  {subData?.planExpiresAt && (
+                    <span className="ml-1 text-gray-400">Renews {new Date(subData.planExpiresAt).toLocaleDateString('en-UG')}</span>
+                  )}
+                </p>
               </div>
-              <span className={`px-3 py-1 rounded-full text-sm font-semibold ${currentPlan === 'PREMIUM' ? 'bg-purple-100 text-purple-700' : currentPlan === 'STANDARD' ? 'bg-brand/10 text-brand' : 'bg-gray-100 text-gray-600'}`}>
-                {currentPlan}
-              </span>
+              <div className="flex items-center gap-2">
+                <TrendingUp className="h-4 w-4 text-brand" />
+                <span className="text-2xl font-black text-brand">{currentPlan.price}</span>
+                <span className="text-gray-400 text-sm">/mo</span>
+              </div>
             </div>
+            {subData?.usage && (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 border-t border-gray-100">
+                <UsageBar label="Units" used={subData.usage.units} limit={subData.usage.unitLimit} />
+                <UsageBar label="Properties" used={subData.usage.properties} limit={subData.usage.propertyLimit} />
+                <div>
+                  <div className="flex justify-between text-xs text-gray-500 mb-1">
+                    <span>Active Tenancies</span>
+                    <span className="font-medium">{subData.usage.activeTenancies}</span>
+                  </div>
+                  <div className="h-2 bg-gray-100 rounded-full" />
+                </div>
+              </div>
+            )}
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+          {/* Plan cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
             {PLANS.map((plan) => {
-              const isCurrent = currentPlan === plan.id
+              const isCurrent = currentPlanId === plan.id || (currentPlanId === 'STARTER' && plan.id === 'FREE')
               return (
                 <div key={plan.id} className={`card relative flex flex-col ${isCurrent ? 'ring-2 ring-brand' : ''}`}>
                   {plan.badge && (
@@ -149,30 +214,39 @@ export default function SettingsPage() {
                       <Check className="h-3 w-3" /> Active
                     </span>
                   )}
-                  <h3 className="text-lg font-bold text-gray-900">{plan.name}</h3>
-                  <div className="mt-1 mb-4">
-                    <span className="text-2xl font-black text-brand">{plan.price}</span>
-                    <span className="text-gray-500 text-sm">{plan.period}</span>
+                  <h3 className="text-base font-bold text-gray-900">{plan.name}</h3>
+                  <div className="mt-1 mb-3">
+                    <span className="text-xl font-black text-brand">{plan.price}</span>
+                    <span className="text-gray-500 text-xs">{plan.period}</span>
                   </div>
-                  <ul className="space-y-2 flex-1 mb-6">
+                  <p className="text-xs text-gray-400 mb-3">
+                    {plan.unitLimit === Infinity ? 'Unlimited units' : `Up to ${plan.unitLimit} units`}
+                  </p>
+                  <ul className="space-y-1.5 flex-1 mb-4">
                     {plan.features.map((f) => (
-                      <li key={f} className="flex items-start gap-2 text-sm text-gray-600">
-                        <Check className="h-4 w-4 text-green-500 flex-shrink-0 mt-0.5" />
+                      <li key={f} className="flex items-start gap-1.5 text-xs text-gray-600">
+                        <Check className="h-3.5 w-3.5 text-green-500 flex-shrink-0 mt-0.5" />
                         {f}
                       </li>
                     ))}
                   </ul>
                   <button
-                    onClick={() => { if (!isCurrent) toast(`To ${plan.id === 'FREE' ? 'downgrade' : 'upgrade'} to ${plan.name}, contact hello@rentflow.ug`) }}
+                    onClick={() => { if (!isCurrent) toast(`To upgrade to ${plan.name}, contact hello@rentflow.ug or call +256 700 000 000`) }}
                     disabled={isCurrent}
-                    className={`w-full py-2 rounded-lg text-sm font-medium transition-colors ${isCurrent ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'btn-primary'}`}
+                    className={`w-full py-2 rounded-lg text-xs font-medium transition-colors ${isCurrent ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'btn-primary'}`}
                   >
-                    {isCurrent ? 'Current Plan' : plan.id === 'FREE' ? 'Downgrade' : `Upgrade to ${plan.name}`}
+                    {isCurrent ? 'Current Plan' : `Upgrade to ${plan.name}`}
                   </button>
                 </div>
               )
             })}
           </div>
+
+          <p className="text-center text-xs text-gray-400">
+            To upgrade or downgrade your plan, contact{' '}
+            <a href="mailto:hello@rentflow.ug" className="text-brand hover:underline">hello@rentflow.ug</a>
+            {' '}or call <strong>+256 700 000 000</strong>. Plans are billed monthly in UGX.
+          </p>
         </div>
       )}
 

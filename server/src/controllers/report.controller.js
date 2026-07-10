@@ -334,4 +334,44 @@ async function exportReport(req, res, next) {
   }
 }
 
-module.exports = { dashboard, monthly, propertyReport, exportReport };
+const PLAN_LIMITS = {
+  FREE:       { units: 5,   properties: 1,  label: 'Starter' },
+  STARTER:    { units: 5,   properties: 1,  label: 'Starter' },
+  GROWTH:     { units: 30,  properties: 10, label: 'Growth' },
+  BUSINESS:   { units: 100, properties: 50, label: 'Business' },
+  ENTERPRISE: { units: Infinity, properties: Infinity, label: 'Enterprise' },
+  PREMIUM:    { units: Infinity, properties: Infinity, label: 'Enterprise' },
+};
+
+async function subscription(req, res, next) {
+  try {
+    const orgId = req.user.organizationId;
+    const org = await prisma.organization.findUnique({ where: { id: orgId } });
+
+    const [totalUnits, totalProperties, activeTenancies] = await Promise.all([
+      prisma.unit.count({ where: { property: { organizationId: orgId } } }),
+      prisma.property.count({ where: { organizationId: orgId, isActive: true } }),
+      prisma.tenancy.count({ where: { property: { organizationId: orgId }, status: 'ACTIVE' } }),
+    ]);
+
+    const plan = org.plan || 'FREE';
+    const limits = PLAN_LIMITS[plan] || PLAN_LIMITS.FREE;
+
+    return ApiResponse.success(res, {
+      plan,
+      planLabel: limits.label,
+      planExpiresAt: org.planExpiresAt,
+      usage: {
+        units: totalUnits,
+        unitLimit: limits.units,
+        properties: totalProperties,
+        propertyLimit: limits.properties,
+        activeTenancies,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { dashboard, monthly, propertyReport, exportReport, subscription };
