@@ -18,8 +18,8 @@ export const EXPENSE_CATEGORIES = [
   { value: 'SECURITY', label: 'Security' },
   { value: 'MAINTENANCE', label: 'Maintenance' },
   { value: 'REPAIRS', label: 'Repairs' },
-  { value: 'KCCA_TAX', label: 'KCCA Tax' },
-  { value: 'URA_TAX', label: 'URA Tax' },
+  { value: 'KCCA_TAX', label: 'Local Authority Tax' },
+  { value: 'URA_TAX', label: 'Income / Rental Tax' },
   { value: 'INSURANCE', label: 'Insurance' },
   { value: 'OTHER', label: 'Other' },
 ]
@@ -110,8 +110,20 @@ export const PLANS = [
 ]
 
 export const COUNTRIES = [
-  { value: 'UG', label: 'Uganda', currency: 'UGX' },
+  { value: 'US', label: 'United States', currency: 'USD' },
+  { value: 'GB', label: 'United Kingdom', currency: 'GBP' },
+  { value: 'CA', label: 'Canada', currency: 'CAD' },
+  { value: 'AU', label: 'Australia', currency: 'AUD' },
+  { value: 'DE', label: 'Germany', currency: 'EUR' },
+  { value: 'FR', label: 'France', currency: 'EUR' },
+  { value: 'AE', label: 'UAE', currency: 'AED' },
+  { value: 'NG', label: 'Nigeria', currency: 'NGN' },
+  { value: 'ZA', label: 'South Africa', currency: 'ZAR' },
+  { value: 'GH', label: 'Ghana', currency: 'GHS' },
   { value: 'KE', label: 'Kenya', currency: 'KES' },
   { value: 'TZ', label: 'Tanzania', currency: 'TZS' },
+  { value: 'UG', label: 'Uganda', currency: 'UGX' },
   { value: 'RW', label: 'Rwanda', currency: 'RWF' },
+  { value: 'IN', label: 'India', currency: 'INR' },
+  { value: 'OTHER', label: 'Other', currency: 'USD' },
 ]

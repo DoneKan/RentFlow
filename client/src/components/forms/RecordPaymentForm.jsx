@@ -99,7 +99,7 @@ export default function RecordPaymentForm({ onClose, defaultTenantId, defaultInv
       )}
 
       <div>
-        <label className="label">Amount (UGX) *</label>
+        <label className="label">Amount *</label>
         <input
           type="number"
           value={form.amount}

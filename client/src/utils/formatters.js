@@ -1,9 +1,10 @@
 import { format, formatDistanceToNow } from 'date-fns'
 
-export function formatCurrency(amount, currency = 'UGX') {
+export function formatCurrency(amount, currency = 'USD') {
   if (amount === null || amount === undefined) return `${currency} 0`
   const num = typeof amount === 'string' ? parseFloat(amount) : amount
-  return `${currency} ${num.toLocaleString('en-UG', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+  const decimals = currency === 'USD' || currency === 'EUR' || currency === 'GBP' ? 2 : 0
+  return `${currency} ${num.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}`
 }
 
 export function formatDate(date) {

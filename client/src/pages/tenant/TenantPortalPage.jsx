@@ -88,7 +88,7 @@ function OverviewTab({ portal }) {
   const unit = portal.unit
   const property = portal.property
   const org = property?.organization
-  const currency = org?.currency || 'UGX'
+  const currency = org?.currency || 'USD'
 
   const overdueCount = portal.invoices?.filter((i) => i.status === 'OVERDUE').length || 0
   const totalPaid = portal.invoices
@@ -188,7 +188,7 @@ function OverviewTab({ portal }) {
 }
 
 function StatementTab({ portal }) {
-  const currency = portal.property?.organization?.currency || 'UGX'
+  const currency = portal.property?.organization?.currency || 'USD'
   const invoices = portal.invoices || []
 
   return (

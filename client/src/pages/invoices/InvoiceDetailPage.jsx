@@ -91,7 +91,7 @@ export default function InvoiceDetailPage() {
               <thead>
                 <tr className="border-b-2 border-gray-200">
                   <th className="text-left text-xs font-semibold text-gray-500 uppercase py-2">Description</th>
-                  <th className="text-right text-xs font-semibold text-gray-500 uppercase py-2">Amount (UGX)</th>
+                  <th className="text-right text-xs font-semibold text-gray-500 uppercase py-2">Amount</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">

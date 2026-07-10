@@ -48,7 +48,7 @@ export default function PropertyDetailPage() {
   const unitCols = [
     { key: 'unitNumber', label: 'Unit #', render: (v) => <span className="font-medium">#{v}</span> },
     { key: 'type', label: 'Type' },
-    { key: 'rentAmount', label: 'Rent (UGX)', render: (v) => formatCurrency(v) },
+    { key: 'rentAmount', label: 'Rent', render: (v) => formatCurrency(v) },
     { key: 'status', label: 'Status', render: (v) => <StatusBadge status={v} /> },
     {
       key: 'tenancy',

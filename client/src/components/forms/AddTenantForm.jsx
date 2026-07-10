@@ -21,7 +21,9 @@ export default function AddTenantForm({ onClose, defaultPropertyId }) {
     rentAmount: '',
     depositAmount: '',
     paymentPeriod: 'MONTHLY',
+    lateFeeType: 'PERCENT',
     lateFeePercent: '10',
+    lateFeeFixed: '',
     gracePeriodDays: '5',
     noticePeriodDays: '30',
     petPolicy: 'NOT_ALLOWED',
@@ -30,9 +32,10 @@ export default function AddTenantForm({ onClose, defaultPropertyId }) {
   })
 
   const { data: propertiesData } = useQuery({
-    queryKey: ['properties'],
-    queryFn: getProperties,
+    queryKey: ['properties', 'all'],
+    queryFn: () => getProperties({ limit: 200 }),
     select: (r) => r.data?.data || [],
+    staleTime: 0,
   })
 
   const { data: unitsData } = useQuery({
@@ -69,8 +72,11 @@ export default function AddTenantForm({ onClose, defaultPropertyId }) {
     e.preventDefault()
     if (!validateStep()) return
     try {
+      const lateFeeText = form.lateFeeType === 'PERCENT'
+        ? `Late fee: ${form.lateFeePercent}% of rent after ${form.gracePeriodDays}-day grace period`
+        : `Late fee: fixed ${form.lateFeeFixed || 0} after ${form.gracePeriodDays}-day grace period`
       const notes = [
-        `Late fee: ${form.lateFeePercent}% after ${form.gracePeriodDays}-day grace period`,
+        lateFeeText,
         `Notice period: ${form.noticePeriodDays} days`,
         `Pet policy: ${form.petPolicy.replace('_', ' ').toLowerCase()}`,
         form.notes ? `Notes: ${form.notes}` : '',
@@ -180,29 +186,52 @@ export default function AddTenantForm({ onClose, defaultPropertyId }) {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="label">Rent amount (UGX) *</label>
+                <label className="label">Rent amount *</label>
                 <input type="number" value={form.rentAmount} onChange={(e) => set('rentAmount', e.target.value)} className="input" required />
               </div>
               <div>
-                <label className="label">Deposit (UGX)</label>
+                <label className="label">Deposit</label>
                 <input type="number" value={form.depositAmount} onChange={(e) => set('depositAmount', e.target.value)} className="input" placeholder="0" />
               </div>
             </div>
 
             <div className="border-t border-gray-100 pt-4">
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Lease Policy</p>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="space-y-3">
                 <div>
-                  <label className="label">Late fee %</label>
-                  <input type="number" min="0" max="50" value={form.lateFeePercent} onChange={(e) => set('lateFeePercent', e.target.value)} className="input" placeholder="10" />
+                  <label className="label">Late fee type</label>
+                  <div className="flex rounded-lg border border-gray-200 overflow-hidden">
+                    {[{ v: 'PERCENT', l: '% of rent' }, { v: 'FIXED', l: 'Fixed amount' }].map(({ v, l }) => (
+                      <button
+                        key={v} type="button"
+                        onClick={() => set('lateFeeType', v)}
+                        className={`flex-1 py-1.5 text-xs font-medium transition-colors ${form.lateFeeType === v ? 'bg-brand text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}
+                      >{l}</button>
+                    ))}
+                  </div>
                 </div>
-                <div>
-                  <label className="label">Grace period (days)</label>
-                  <input type="number" min="0" max="30" value={form.gracePeriodDays} onChange={(e) => set('gracePeriodDays', e.target.value)} className="input" placeholder="5" />
-                </div>
-                <div>
-                  <label className="label">Notice period (days)</label>
-                  <input type="number" min="0" max="90" value={form.noticePeriodDays} onChange={(e) => set('noticePeriodDays', e.target.value)} className="input" placeholder="30" />
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    {form.lateFeeType === 'PERCENT' ? (
+                      <>
+                        <label className="label">Late fee %</label>
+                        <input type="number" min="0" max="100" value={form.lateFeePercent} onChange={(e) => set('lateFeePercent', e.target.value)} className="input" placeholder="10" />
+                      </>
+                    ) : (
+                      <>
+                        <label className="label">Fixed late fee</label>
+                        <input type="number" min="0" value={form.lateFeeFixed} onChange={(e) => set('lateFeeFixed', e.target.value)} className="input" placeholder="50" />
+                      </>
+                    )}
+                  </div>
+                  <div>
+                    <label className="label">Grace period (days)</label>
+                    <input type="number" min="0" max="30" value={form.gracePeriodDays} onChange={(e) => set('gracePeriodDays', e.target.value)} className="input" placeholder="5" />
+                  </div>
+                  <div>
+                    <label className="label">Notice period (days)</label>
+                    <input type="number" min="0" max="90" value={form.noticePeriodDays} onChange={(e) => set('noticePeriodDays', e.target.value)} className="input" placeholder="30" />
+                  </div>
                 </div>
               </div>
               <div className="mt-3">

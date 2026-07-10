@@ -58,7 +58,7 @@ export default function TenantsPage() {
     },
     {
       key: 'rentAmount',
-      label: 'Rent (UGX)',
+      label: 'Rent',
       render: (v) => formatCurrency(v),
     },
     {

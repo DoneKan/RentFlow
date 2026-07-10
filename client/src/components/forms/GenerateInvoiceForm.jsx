@@ -145,7 +145,7 @@ export default function GenerateInvoiceForm({ onClose, defaultTenantId }) {
           <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="input" required />
         </div>
         <div>
-          <label className="label">Late penalty (UGX)</label>
+          <label className="label">Late penalty</label>
           <input type="number" value={latePenalty} onChange={(e) => setLatePenalty(e.target.value)} className="input" placeholder="0" />
         </div>
       </div>

@@ -21,9 +21,10 @@ export default function LogExpenseForm({ onClose, defaultPropertyId }) {
   const set = (k, v) => setForm((p) => ({ ...p, [k]: v }))
 
   const { data: propertiesData } = useQuery({
-    queryKey: ['properties'],
-    queryFn: getProperties,
+    queryKey: ['properties', 'all'],
+    queryFn: () => getProperties({ limit: 200 }),
     select: (r) => r.data?.data || [],
+    staleTime: 0,
   })
 
   const handleSubmit = async (e) => {
@@ -69,7 +70,7 @@ export default function LogExpenseForm({ onClose, defaultPropertyId }) {
 
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="label">Amount (UGX) *</label>
+          <label className="label">Amount *</label>
           <input type="number" value={form.amount} onChange={(e) => set('amount', e.target.value)} className="input" placeholder="0" required />
         </div>
         <div>

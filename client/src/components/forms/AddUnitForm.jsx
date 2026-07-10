@@ -99,7 +99,7 @@ export default function AddUnitForm({ propertyId, onClose }) {
 
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="label">Rent amount (UGX) *</label>
+          <label className="label">Rent amount *</label>
           <input type="number" value={form.rentAmount} onChange={(e) => set('rentAmount', e.target.value)} className="input" placeholder="800000" required />
         </div>
         <div>
@@ -137,7 +137,7 @@ export default function AddUnitForm({ propertyId, onClose }) {
               <div key={i} className="flex items-center justify-between bg-gray-50 px-3 py-2 rounded-lg text-sm">
                 <span className="text-gray-700">{c.name}</span>
                 <div className="flex items-center gap-3">
-                  <span className="text-gray-900 font-medium">UGX {Number(c.amount).toLocaleString()}</span>
+                  <span className="text-gray-900 font-medium">{Number(c.amount).toLocaleString()}</span>
                   <button type="button" onClick={() => removeCharge(i)} className="text-red-400 hover:text-red-600">
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>

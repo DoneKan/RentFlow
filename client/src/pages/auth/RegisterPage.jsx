@@ -19,8 +19,8 @@ export default function RegisterPage() {
     organizationName: '',
     organizationType: 'INDIVIDUAL',
     registrationNumber: '',
-    country: 'UG',
-    currency: 'UGX',
+    country: 'US',
+    currency: 'USD',
     terms: false,
   })
 
@@ -31,7 +31,7 @@ export default function RegisterPage() {
 
   const handleCountryChange = (e) => {
     const country = COUNTRIES.find((c) => c.value === e.target.value)
-    setForm((p) => ({ ...p, country: e.target.value, currency: country?.currency || 'UGX' }))
+    setForm((p) => ({ ...p, country: e.target.value, currency: country?.currency || 'USD' }))
   }
 
   const handleSubmit = async (e) => {
@@ -89,14 +89,14 @@ export default function RegisterPage() {
             Start managing your properties professionally
           </h2>
           <p className="mt-3 text-white/60 text-sm">
-            Join hundreds of landlords and property managers in Uganda who use RentFlow.
+            Join landlords and property managers worldwide who use RentFlow to run their portfolios.
           </p>
           <div className="mt-6 space-y-4">
             {[
-              { emoji: '📱', text: 'MTN & Airtel Mobile Money' },
+              { emoji: '💳', text: 'Online & mobile payment tracking' },
               { emoji: '📄', text: 'Automated invoices & PDF receipts' },
               { emoji: '📊', text: 'Monthly financial reports' },
-              { emoji: '💬', text: 'SMS & email notifications' },
+              { emoji: '💬', text: 'Tenant portal & notifications' },
             ].map((f) => (
               <div key={f.text} className="flex items-center gap-3">
                 <span className="text-xl">{f.emoji}</span>
@@ -105,7 +105,7 @@ export default function RegisterPage() {
             ))}
           </div>
         </div>
-        <p className="text-white/30 text-xs">Built for Uganda. Ready for East Africa.</p>
+        <p className="text-white/30 text-xs">Built for property managers everywhere.</p>
       </div>
 
       {/* Right form */}
@@ -123,11 +123,11 @@ export default function RegisterPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="label">Full name</label>
-                <input name="name" value={form.name} onChange={handleChange} className="input" placeholder="John Ssemanda" required />
+                <input name="name" value={form.name} onChange={handleChange} className="input" placeholder="John Smith" required />
               </div>
               <div>
                 <label className="label">Phone number</label>
-                <input name="phone" value={form.phone} onChange={handleChange} className="input" placeholder="+256 700 000 000" />
+                <input name="phone" value={form.phone} onChange={handleChange} className="input" placeholder="+1 555 000 0000" />
               </div>
             </div>
 
@@ -164,7 +164,7 @@ export default function RegisterPage() {
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Organisation</p>
               <div>
                 <label className="label">Organisation / Business name</label>
-                <input name="organizationName" value={form.organizationName} onChange={handleChange} className="input" placeholder="Kampala Properties Ltd" required />
+                <input name="organizationName" value={form.organizationName} onChange={handleChange} className="input" placeholder="Acme Properties LLC" required />
               </div>
 
               <div className="mt-3">

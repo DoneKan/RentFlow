@@ -30,8 +30,8 @@ const PLANS = [
   {
     id: 'FREE',
     name: 'Starter',
-    price: 'UGX 0',
-    period: '/month',
+    price: 'Free',
+    period: '',
     unitLimit: 5,
     features: ['1 property', 'Up to 5 units', 'Rent tracking & invoicing', 'Tenant portal', 'Basic reports'],
     badge: null,
@@ -40,7 +40,7 @@ const PLANS = [
   {
     id: 'GROWTH',
     name: 'Growth',
-    price: 'UGX 75,000',
+    price: '$20',
     period: '/month',
     unitLimit: 30,
     features: ['Up to 10 properties', 'Up to 30 units', 'Full invoicing & payments', 'Maintenance requests', 'Monthly reports & CSV export', 'Email reminders'],
@@ -50,7 +50,7 @@ const PLANS = [
   {
     id: 'BUSINESS',
     name: 'Business',
-    price: 'UGX 180,000',
+    price: '$49',
     period: '/month',
     unitLimit: 100,
     features: ['Up to 50 properties', 'Up to 100 units', 'All Growth features', 'Advanced analytics', 'Multi-manager access', 'PDF receipts', 'Priority support'],
@@ -60,7 +60,7 @@ const PLANS = [
   {
     id: 'ENTERPRISE',
     name: 'Enterprise',
-    price: 'UGX 400,000',
+    price: '$109',
     period: '/month',
     unitLimit: Infinity,
     features: ['Unlimited properties', 'Unlimited units', 'All Business features', 'Custom branding', 'Dedicated account manager', 'SLA guarantee', 'API access'],
@@ -146,7 +146,7 @@ export default function SettingsPage() {
               { label: 'Email', value: user?.organization?.email || user?.email },
               { label: 'Phone', value: user?.organization?.phone || '—' },
               { label: 'Country', value: user?.organization?.country || 'UG' },
-              { label: 'Currency', value: user?.organization?.currency || 'UGX' },
+              { label: 'Currency', value: user?.organization?.currency || 'USD' },
               { label: 'Plan', value: currentPlan.name },
             ].map(({ label, value }) => (
               <div key={label} className="bg-gray-50 rounded-lg px-4 py-3">
@@ -244,8 +244,8 @@ export default function SettingsPage() {
 
           <p className="text-center text-xs text-gray-400">
             To upgrade or downgrade your plan, contact{' '}
-            <a href="mailto:hello@rentflow.ug" className="text-brand hover:underline">hello@rentflow.ug</a>
-            {' '}or call <strong>+256 700 000 000</strong>. Plans are billed monthly in UGX.
+            <a href="mailto:hello@rentflow.ug" className="text-brand hover:underline">hello@rentflow.ug</a>.
+            {' '}Plans are billed monthly in USD.
           </p>
         </div>
       )}
