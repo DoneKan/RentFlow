@@ -1,7 +1,15 @@
-﻿import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { ChevronLeft, ChevronRight, Download, TrendingUp, AlertCircle, Receipt, DollarSign } from 'lucide-react'
-import { format, subMonths, addMonths } from 'date-fns'
+import {
+  Download, TrendingUp, TrendingDown, AlertCircle, Receipt, DollarSign,
+  Building2, LayoutGrid, Percent,
+} from 'lucide-react'
+import {
+  startOfMonth, endOfMonth, subMonths,
+  startOfQuarter, endOfQuarter,
+  startOfYear, endOfYear,
+  format,
+} from 'date-fns'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, PieChart, Pie, Cell, Legend,
@@ -9,8 +17,9 @@ import {
 import toast from 'react-hot-toast'
 import PageHeader from '../../components/ui/PageHeader'
 import StatCard from '../../components/ui/StatCard'
+import DataTable from '../../components/ui/DataTable'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
-import { getMonthlyReport, exportReport } from '../../services/report.service'
+import { getFinancialOverview, getFinancialByProperty, exportReport } from '../../services/report.service'
 import { formatCurrency } from '../../utils/formatters'
 
 const PIE_COLORS = {
@@ -30,42 +39,95 @@ const CATEGORY_LABELS = {
   INSURANCE: 'Insurance', OTHER: 'Other',
 }
 
+const RANGE_PRESETS = [
+  { key: 'this-month', label: 'This Month' },
+  { key: 'last-month', label: 'Last Month' },
+  { key: 'this-quarter', label: 'This Quarter' },
+  { key: 'this-year', label: 'This Year' },
+]
+
+function resolvePreset(preset) {
+  const now = new Date()
+  switch (preset) {
+    case 'last-month': {
+      const d = subMonths(now, 1)
+      return { start: startOfMonth(d), end: endOfMonth(d) }
+    }
+    case 'this-quarter':
+      return { start: startOfQuarter(now), end: endOfQuarter(now) }
+    case 'this-year':
+      return { start: startOfYear(now), end: endOfYear(now) }
+    case 'this-month':
+    default:
+      return { start: startOfMonth(now), end: endOfMonth(now) }
+  }
+}
+
 export default function ReportsPage() {
-  const [currentDate, setCurrentDate] = useState(new Date())
+  const [tab, setTab] = useState('overview')
+  const [preset, setPreset] = useState('this-month')
   const [exporting, setExporting] = useState(false)
+  const [sortKey, setSortKey] = useState('revenue')
+  const [sortDir, setSortDir] = useState('desc')
 
-  const month = currentDate.getMonth() + 1
-  const year = currentDate.getFullYear()
+  const { start, end } = useMemo(() => resolvePreset(preset), [preset])
+  const params = useMemo(
+    () => ({ startDate: format(start, 'yyyy-MM-dd'), endDate: format(end, 'yyyy-MM-dd') }),
+    [start, end]
+  )
+  const periodLabel = useMemo(() => {
+    if (preset === 'this-year') return format(start, 'yyyy')
+    if (preset === 'this-quarter') return `${format(start, 'MMM')} – ${format(end, 'MMM yyyy')}`
+    return format(start, 'MMMM yyyy')
+  }, [preset, start, end])
 
-  const { data: reportRes, isLoading } = useQuery({
-    queryKey: ['monthly-report', month, year],
-    queryFn: () => getMonthlyReport(month, year),
+  const { data: overview, isLoading: overviewLoading } = useQuery({
+    queryKey: ['financial-overview', params.startDate, params.endDate],
+    queryFn: () => getFinancialOverview(params),
     select: (r) => r.data,
+    enabled: tab === 'overview',
   })
 
-  const report = reportRes || {}
-  const summary = report.summary || {}
-  const propertyBreakdown = report.propertyBreakdown || []
-  const expenseByCategory = report.expenseByCategory || {}
-
-  const last6Months = Array.from({ length: 6 }, (_, i) => {
-    const d = subMonths(currentDate, 5 - i)
-    return { month: format(d, 'MMM'), revenue: 0, expenses: 0 }
+  const { data: byProperty, isLoading: byPropertyLoading } = useQuery({
+    queryKey: ['financial-by-property', params.startDate, params.endDate],
+    queryFn: () => getFinancialByProperty(params),
+    select: (r) => r.data,
+    enabled: tab === 'by-property',
   })
 
-  const pieData = Object.entries(expenseByCategory)
-    .filter(([, v]) => v > 0)
-    .map(([k, v]) => ({ name: CATEGORY_LABELS[k] || k, value: Number(v), color: PIE_COLORS[k] || '#6b7280' }))
+  const pieData = (overview?.expenses?.byCategory || [])
+    .filter((c) => c.amount > 0)
+    .map((c) => ({ name: CATEGORY_LABELS[c.category] || c.category, value: c.amount, color: PIE_COLORS[c.category] || '#6b7280' }))
 
-  const handleExport = async () => {
+  const sortedProperties = useMemo(() => {
+    const rows = byProperty?.properties || []
+    const sorted = [...rows].sort((a, b) => {
+      const av = a[sortKey] ?? 0
+      const bv = b[sortKey] ?? 0
+      if (typeof av === 'string') return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av)
+      return sortDir === 'asc' ? av - bv : bv - av
+    })
+    return sorted
+  }, [byProperty, sortKey, sortDir])
+
+  const handleSortChange = (key) => {
+    if (key === sortKey) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+    } else {
+      setSortKey(key)
+      setSortDir('desc')
+    }
+  }
+
+  const handleExport = async (type) => {
     setExporting(true)
     try {
-      const data = await exportReport({ month, year })
+      const data = await exportReport({ ...params, type })
       const blob = new Blob([data], { type: 'text/csv' })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `rentflow-report-${year}-${String(month).padStart(2, '0')}.csv`
+      a.download = `rentflow-${type}-${params.startDate}.csv`
       a.click()
       URL.revokeObjectURL(url)
       toast.success('Report exported')
@@ -76,112 +138,188 @@ export default function ReportsPage() {
     }
   }
 
+  const propertyColumns = [
+    { key: 'propertyName', label: 'Property', sortable: true },
+    {
+      key: 'occupancyRate', label: 'Occupancy', sortable: true,
+      render: (v, row) => (
+        <div className="flex items-center gap-2">
+          <div className="w-16 h-1.5 bg-gray-200 rounded-full">
+            <div className="h-1.5 bg-green-500 rounded-full" style={{ width: `${v}%` }} />
+          </div>
+          <span className="text-xs text-gray-500">{v}% ({row.occupiedUnits}/{row.totalUnits})</span>
+        </div>
+      ),
+    },
+    { key: 'invoicesRaised', label: 'Invoices', sortable: true },
+    { key: 'revenue', label: 'Revenue', sortable: true, render: (v) => <span className="font-semibold text-green-700">{formatCurrency(v)}</span> },
+    { key: 'expenses', label: 'Expenses', sortable: true, render: (v) => <span className="font-medium text-red-600">{formatCurrency(v)}</span> },
+    { key: 'outstanding', label: 'Outstanding', sortable: true, render: (v) => <span className={v > 0 ? 'text-orange-600 font-medium' : 'text-gray-400'}>{formatCurrency(v)}</span> },
+    { key: 'netIncome', label: 'Net Income', sortable: true, render: (v) => <span className={`font-semibold ${v >= 0 ? 'text-gray-900' : 'text-red-600'}`}>{formatCurrency(v)}</span> },
+    { key: 'margin', label: 'Margin', sortable: true, render: (v) => <span className="text-gray-600">{v}%</span> },
+  ]
+
   return (
     <div className="space-y-6">
       <PageHeader
         title="Reports & Analytics"
-        subtitle="Monthly financial overview"
+        subtitle={`Financial performance — ${periodLabel}`}
         actions={[
-          <button key="export" onClick={handleExport} disabled={exporting} className="btn-secondary flex items-center gap-2">
+          <button
+            key="export"
+            onClick={() => handleExport(tab === 'overview' ? 'overall' : 'by-property')}
+            disabled={exporting}
+            className="btn-secondary flex items-center gap-2"
+          >
             <Download className="h-4 w-4" />
             {exporting ? 'Exporting…' : 'Export CSV'}
           </button>,
         ]}
       />
 
-      {/* Month navigation */}
-      <div className="flex items-center gap-4">
-        <button onClick={() => setCurrentDate(d => subMonths(d, 1))} className="p-2 rounded-lg hover:bg-gray-100">
-          <ChevronLeft className="h-5 w-5" />
-        </button>
-        <span className="text-lg font-semibold w-40 text-center">{format(currentDate, 'MMMM yyyy')}</span>
-        <button
-          onClick={() => setCurrentDate(d => addMonths(d, 1))}
-          disabled={currentDate >= new Date()}
-          className="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-40"
-        >
-          <ChevronRight className="h-5 w-5" />
-        </button>
+      {/* Tabs + period selector */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-1">
+          <button
+            onClick={() => setTab('overview')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+              tab === 'overview' ? 'bg-white shadow-sm text-brand' : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <LayoutGrid className="h-4 w-4" /> Overall
+          </button>
+          <button
+            onClick={() => setTab('by-property')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+              tab === 'by-property' ? 'bg-white shadow-sm text-brand' : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <Building2 className="h-4 w-4" /> By Property
+          </button>
+        </div>
+
+        <div className="flex items-center gap-1 flex-wrap">
+          {RANGE_PRESETS.map((p) => (
+            <button
+              key={p.key}
+              onClick={() => setPreset(p.key)}
+              className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                preset === p.key ? 'bg-brand text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {isLoading ? <LoadingSpinner /> : (
-        <>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <StatCard title="Total Collected" value={formatCurrency(summary.totalCollected || 0)} icon={TrendingUp} color="green" />
-            <StatCard title="Outstanding" value={formatCurrency(summary.totalOutstanding || 0)} icon={AlertCircle} color="orange" />
-            <StatCard title="Total Expenses" value={formatCurrency(summary.totalExpenses || 0)} icon={Receipt} color="red" />
-            <StatCard title="Net Income" value={formatCurrency(summary.netIncome || 0)} icon={DollarSign} />
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Revenue vs Expenses chart */}
-            <div className="card">
-              <h3 className="text-sm font-semibold text-gray-700 mb-4">Revenue vs Expenses (6 months)</h3>
-              <ResponsiveContainer width="100%" height={220}>
-                <BarChart data={last6Months}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                  <XAxis dataKey="month" tick={{ fontSize: 12 }} />
-                  <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `${(v/1000).toFixed(0)}K`} />
-                  <Tooltip formatter={(v) => formatCurrency(v)} />
-                  <Legend />
-                  <Bar dataKey="revenue" fill="#1e3a5f" name="Revenue" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="expenses" fill="#ef4444" name="Expenses" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+      {tab === 'overview' && (
+        overviewLoading ? <LoadingSpinner /> : (
+          <>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <StatCard
+                title="Revenue Collected"
+                value={formatCurrency(overview?.revenue?.total || 0)}
+                icon={TrendingUp}
+                colorClass="bg-green-500"
+                subtitle={`${overview?.revenue?.count || 0} payments`}
+              />
+              <StatCard
+                title="Outstanding"
+                value={formatCurrency(overview?.outstanding?.total || 0)}
+                icon={AlertCircle}
+                colorClass="bg-orange-500"
+                subtitle={`${overview?.outstanding?.count || 0} unpaid invoices`}
+              />
+              <StatCard
+                title="Total Expenses"
+                value={formatCurrency(overview?.expenses?.total || 0)}
+                icon={Receipt}
+                colorClass="bg-red-500"
+              />
+              <StatCard
+                title="Net Income"
+                value={formatCurrency(overview?.netIncome || 0)}
+                icon={overview?.netIncome >= 0 ? DollarSign : TrendingDown}
+                colorClass={overview?.netIncome >= 0 ? 'bg-brand' : 'bg-red-500'}
+                subtitle={`${overview?.collectionRate ?? 0}% collection rate`}
+              />
             </div>
 
-            {/* Expense category pie */}
-            <div className="card">
-              <h3 className="text-sm font-semibold text-gray-700 mb-4">Expenses by Category</h3>
-              {pieData.length === 0 ? (
-                <div className="flex items-center justify-center h-[220px] text-gray-400 text-sm">No expenses this month</div>
-              ) : (
-                <ResponsiveContainer width="100%" height={220}>
-                  <PieChart>
-                    <Pie data={pieData} cx="50%" cy="50%" outerRadius={80} dataKey="value" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
-                      {pieData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
-                    </Pie>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="card">
+                <h3 className="text-sm font-semibold text-gray-700 mb-4">Revenue vs Expenses (6 months)</h3>
+                <ResponsiveContainer width="100%" height={240}>
+                  <BarChart data={overview?.trend || []}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                    <XAxis dataKey="month" tick={{ fontSize: 12 }} />
+                    <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}K`} />
                     <Tooltip formatter={(v) => formatCurrency(v)} />
-                  </PieChart>
+                    <Legend />
+                    <Bar dataKey="revenue" fill="#1e3a5f" name="Revenue" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="expenses" fill="#ef4444" name="Expenses" radius={[4, 4, 0, 0]} />
+                  </BarChart>
                 </ResponsiveContainer>
-              )}
-            </div>
-          </div>
+              </div>
 
-          {/* Per-property breakdown */}
-          {propertyBreakdown.length > 0 && (
-            <div className="card overflow-x-auto">
-              <h3 className="text-sm font-semibold text-gray-700 mb-4">Per-Property Breakdown</h3>
-              <table className="min-w-full text-sm">
-                <thead>
-                  <tr className="border-b border-gray-100">
-                    {['Property', 'Units', 'Occupancy', 'Revenue', 'Invoices'].map(h => (
-                      <th key={h} className="text-left py-2 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {propertyBreakdown.map((p) => (
-                    <tr key={p.id} className="hover:bg-gray-50">
-                      <td className="py-3 px-3 font-medium">{p.name}</td>
-                      <td className="py-3 px-3 text-gray-600">{p.totalUnits}</td>
-                      <td className="py-3 px-3">
-                        <div className="flex items-center gap-2">
-                          <div className="w-16 h-1.5 bg-gray-200 rounded-full">
-                            <div className="h-1.5 bg-green-500 rounded-full" style={{ width: `${p.occupancyRate}%` }} />
-                          </div>
-                          <span className="text-xs text-gray-500">{p.occupancyRate}%</span>
-                        </div>
-                      </td>
-                      <td className="py-3 px-3 font-semibold text-green-700">{formatCurrency(p.collected || 0)}</td>
-                      <td className="py-3 px-3 text-gray-600">{p.invoicesRaised}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <div className="card">
+                <h3 className="text-sm font-semibold text-gray-700 mb-4">Expenses by Category</h3>
+                {pieData.length === 0 ? (
+                  <div className="flex items-center justify-center h-[240px] text-gray-400 text-sm">No expenses this period</div>
+                ) : (
+                  <ResponsiveContainer width="100%" height={240}>
+                    <PieChart>
+                      <Pie data={pieData} cx="50%" cy="50%" outerRadius={80} dataKey="value" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
+                        {pieData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
+                      </Pie>
+                      <Tooltip formatter={(v) => formatCurrency(v)} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
             </div>
-          )}
-        </>
+
+            <div className="card">
+              <div className="flex items-center gap-2 mb-1">
+                <Percent className="h-4 w-4 text-gray-400" />
+                <h3 className="text-sm font-semibold text-gray-700">Collection Health</h3>
+              </div>
+              <p className="text-sm text-gray-500">
+                Of {formatCurrency(overview?.invoiced?.total || 0)} invoiced this period, {formatCurrency(overview?.revenue?.total || 0)} has
+                been collected ({overview?.collectionRate ?? 0}%), leaving {formatCurrency(overview?.outstanding?.total || 0)} outstanding
+                across {overview?.outstanding?.count || 0} invoice(s).
+              </p>
+            </div>
+          </>
+        )
+      )}
+
+      {tab === 'by-property' && (
+        byPropertyLoading ? <LoadingSpinner /> : (
+          <>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <StatCard title="Properties" value={byProperty?.properties?.length || 0} icon={Building2} colorClass="bg-indigo-500" />
+              <StatCard title="Total Revenue" value={formatCurrency(byProperty?.totals?.revenue || 0)} icon={TrendingUp} colorClass="bg-green-500" />
+              <StatCard title="Total Expenses" value={formatCurrency(byProperty?.totals?.expenses || 0)} icon={Receipt} colorClass="bg-red-500" />
+              <StatCard
+                title="Net Income"
+                value={formatCurrency(byProperty?.totals?.netIncome || 0)}
+                icon={DollarSign}
+                colorClass="bg-brand"
+                subtitle={`${byProperty?.totals?.margin ?? 0}% margin`}
+              />
+            </div>
+
+            <DataTable
+              columns={propertyColumns}
+              data={sortedProperties}
+              emptyMessage="No active properties in this period"
+              sortKey={sortKey}
+              sortDir={sortDir}
+              onSortChange={handleSortChange}
+            />
+          </>
+        )
       )}
     </div>
   )

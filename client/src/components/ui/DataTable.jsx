@@ -1,4 +1,4 @@
-import { FileX } from 'lucide-react'
+import { FileX, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react'
 
 function SkeletonRow({ cols }) {
   return (
@@ -18,21 +18,43 @@ export default function DataTable({
   loading = false,
   emptyMessage = 'No data found',
   onRowClick,
+  sortKey,
+  sortDir = 'asc',
+  onSortChange,
 }) {
   return (
     <div className="overflow-x-auto rounded-xl border border-gray-100 shadow-sm bg-white">
       <table className="min-w-full divide-y divide-gray-100">
         <thead className="bg-gray-50">
           <tr>
-            {columns.map((col) => (
-              <th
-                key={col.key}
-                scope="col"
-                className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap"
-              >
-                {col.label}
-              </th>
-            ))}
+            {columns.map((col) => {
+              const sortable = col.sortable && onSortChange
+              const isActive = sortKey === col.key
+              return (
+                <th
+                  key={col.key}
+                  scope="col"
+                  className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap"
+                >
+                  {sortable ? (
+                    <button
+                      type="button"
+                      onClick={() => onSortChange(col.key)}
+                      className="flex items-center gap-1 hover:text-gray-700"
+                    >
+                      {col.label}
+                      {isActive ? (
+                        sortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />
+                      ) : (
+                        <ChevronsUpDown className="h-3 w-3 opacity-40" />
+                      )}
+                    </button>
+                  ) : (
+                    col.label
+                  )}
+                </th>
+              )
+            })}
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-50">
