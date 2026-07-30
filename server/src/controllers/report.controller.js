@@ -235,28 +235,47 @@ async function computeOverview(orgId, start, end) {
 // Core data for the "By Property" report: revenue/expenses/occupancy per
 // property so a landlord can see which buildings are actually profitable.
 async function computeByProperty(orgId, start, end) {
-  const properties = await prisma.property.findMany({
-    where: { organizationId: orgId, isActive: true },
-    include: {
-      units: { select: { status: true } },
-      invoices: {
-        where: { dueDate: { gte: start, lte: end } },
-        select: {
-          amount: true,
-          status: true,
-          payments: {
-            where: { status: 'COMPLETED', paidAt: { gte: start, lte: end } },
-            select: { amount: true },
+  const [properties, outstandingByProperty] = await Promise.all([
+    prisma.property.findMany({
+      where: { organizationId: orgId, isActive: true },
+      include: {
+        units: { select: { status: true } },
+        invoices: {
+          where: { dueDate: { gte: start, lte: end } },
+          select: {
+            amount: true,
+            status: true,
+            payments: {
+              where: { status: 'COMPLETED', paidAt: { gte: start, lte: end } },
+              select: { amount: true },
+            },
           },
         },
+        expenses: {
+          where: { date: { gte: start, lte: end } },
+          select: { amount: true, category: true },
+        },
       },
-      expenses: {
-        where: { date: { gte: start, lte: end } },
-        select: { amount: true, category: true },
+      orderBy: { name: 'asc' },
+    }),
+    // Cumulative-to-date unpaid balance per property, matching
+    // computeOverview's outstanding definition — not scoped to invoices
+    // raised within the selected window, so it doesn't miss earlier
+    // unpaid invoices that are still owed.
+    prisma.invoice.groupBy({
+      by: ['propertyId'],
+      where: {
+        property: { organizationId: orgId, isActive: true },
+        status: { in: ['SENT', 'OVERDUE'] },
+        dueDate: { lte: end },
       },
-    },
-    orderBy: { name: 'asc' },
-  });
+      _sum: { amount: true },
+    }),
+  ]);
+
+  const outstandingMap = Object.fromEntries(
+    outstandingByProperty.map((r) => [r.propertyId, Number(r._sum.amount || 0)])
+  );
 
   const rows = properties
     .map((prop) => {
@@ -267,9 +286,7 @@ async function computeByProperty(orgId, start, end) {
         (sum, inv) => sum + inv.payments.reduce((s, p) => s + Number(p.amount), 0),
         0
       );
-      const outstanding = prop.invoices
-        .filter((inv) => ['SENT', 'OVERDUE'].includes(inv.status))
-        .reduce((sum, inv) => sum + Number(inv.amount), 0);
+      const outstanding = outstandingMap[prop.id] || 0;
 
       const expensesByCategory = {};
       prop.expenses.forEach((e) => {
