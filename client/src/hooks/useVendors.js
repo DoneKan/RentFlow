@@ -10,7 +10,7 @@ export const useVendors = (params) =>
 export const useVendorHistory = (id) =>
   useQuery({
     queryKey: ['vendors', id, 'history'],
-    queryFn: () => svc.getVendorHistory(id).then((r) => r.data),
+    queryFn: () => svc.getVendorHistory(id).then((r) => r.data.data),
     enabled: !!id,
   })
 

@@ -4,7 +4,7 @@ import * as svc from '../services/account.service'
 export const useAccounts = (params) =>
   useQuery({
     queryKey: ['accounts', params],
-    queryFn: () => svc.listAccounts(params).then((r) => r.data),
+    queryFn: () => svc.listAccounts(params).then((r) => r.data.data),
   })
 
 export const useCreateAccount = () => {

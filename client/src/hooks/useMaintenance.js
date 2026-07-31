@@ -50,5 +50,5 @@ export const useCompleteMaintenance = () => {
 export const useMyPortal = () =>
   useQuery({
     queryKey: ['tenant-portal'],
-    queryFn: () => svc.getMyPortal().then((r) => r.data),
+    queryFn: () => svc.getMyPortal().then((r) => r.data.data),
   })

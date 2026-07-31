@@ -10,7 +10,7 @@ export const useInspections = (params) =>
 export const useInspection = (id) =>
   useQuery({
     queryKey: ['inspections', id],
-    queryFn: () => svc.getInspection(id).then((r) => r.data),
+    queryFn: () => svc.getInspection(id).then((r) => r.data.data),
     enabled: !!id,
   })
 

@@ -4,7 +4,7 @@ import * as svc from '../services/lease.service'
 export const useLeaseDocuments = (params) =>
   useQuery({
     queryKey: ['lease-documents', params],
-    queryFn: () => svc.listLeaseDocuments(params).then((r) => r.data),
+    queryFn: () => svc.listLeaseDocuments(params).then((r) => r.data.data),
   })
 
 export const useCreateLeaseDocument = () => {

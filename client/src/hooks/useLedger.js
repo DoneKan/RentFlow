@@ -10,5 +10,5 @@ export const useJournalEntries = (params) =>
 export const useTrialBalance = (params) =>
   useQuery({
     queryKey: ['ledger', 'trial-balance', params],
-    queryFn: () => svc.getTrialBalance(params).then((r) => r.data),
+    queryFn: () => svc.getTrialBalance(params).then((r) => r.data.data),
   })

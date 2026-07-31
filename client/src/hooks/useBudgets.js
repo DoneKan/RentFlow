@@ -4,20 +4,20 @@ import * as svc from '../services/budget.service'
 export const useBudgets = (params) =>
   useQuery({
     queryKey: ['budgets', params],
-    queryFn: () => svc.listBudgets(params).then((r) => r.data),
+    queryFn: () => svc.listBudgets(params).then((r) => r.data.data),
   })
 
 export const useBudget = (id) =>
   useQuery({
     queryKey: ['budgets', id],
-    queryFn: () => svc.getBudget(id).then((r) => r.data),
+    queryFn: () => svc.getBudget(id).then((r) => r.data.data),
     enabled: !!id,
   })
 
 export const useBudgetVariance = (id) =>
   useQuery({
     queryKey: ['budgets', id, 'variance'],
-    queryFn: () => svc.getBudgetVariance(id).then((r) => r.data),
+    queryFn: () => svc.getBudgetVariance(id).then((r) => r.data.data),
     enabled: !!id,
   })
 
