@@ -1,8 +1,11 @@
 import { useState } from 'react'
 import { Wrench, Plus, CheckCircle, Clock, AlertCircle, XCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { useMaintenance, useUpdateMaintenance, useDeleteMaintenance } from '../../hooks/useMaintenance'
-import { formatDate } from '../../utils/formatters'
+import {
+  useMaintenance, useUpdateMaintenance, useDeleteMaintenance, useAssignVendor, useCompleteMaintenance,
+} from '../../hooks/useMaintenance'
+import { useVendors } from '../../hooks/useVendors'
+import { formatDate, formatCurrency } from '../../utils/formatters'
 import StatusBadge from '../../components/ui/StatusBadge'
 import DataTable from '../../components/ui/DataTable'
 import Modal from '../../components/ui/Modal'
@@ -17,6 +20,87 @@ const PRIORITY_COLORS = {
 }
 
 const STATUS_OPTIONS = ['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED']
+
+function VendorAssignment({ request }) {
+  const { data: vendorsData } = useVendors({ isActive: 'true' })
+  const assign = useAssignVendor()
+  const complete = useCompleteMaintenance()
+  const [cost, setCost] = useState(request.cost ?? '')
+  const [vendorNotes, setVendorNotes] = useState(request.vendorNotes || '')
+  const vendors = vendorsData?.data || []
+
+  const handleAssign = async (vendorId) => {
+    if (!vendorId) return
+    try {
+      await assign.mutateAsync({ id: request.id, vendorId })
+      toast.success('Vendor assigned')
+    } catch {
+      toast.error('Failed to assign vendor')
+    }
+  }
+
+  const handleComplete = async () => {
+    try {
+      await complete.mutateAsync({ id: request.id, data: { cost: cost === '' ? undefined : parseFloat(cost), vendorNotes } })
+      toast.success('Marked as complete')
+    } catch {
+      toast.error('Failed to complete request')
+    }
+  }
+
+  return (
+    <div className="space-y-3 border-t border-gray-100 pt-4">
+      <p className="text-xs text-gray-500 mb-2">Vendor</p>
+      <select
+        defaultValue={request.vendorId || ''}
+        onChange={(e) => handleAssign(e.target.value)}
+        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+      >
+        <option value="">Unassigned</option>
+        {vendors.map((v) => <option key={v.id} value={v.id}>{v.name} ({v.category.replace('_', ' ')})</option>)}
+      </select>
+
+      {request.vendorId && request.status !== 'RESOLVED' && (
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Cost</label>
+            <input
+              type="number"
+              step="any"
+              value={cost}
+              onChange={(e) => setCost(e.target.value)}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+              placeholder="0"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Vendor notes</label>
+            <input
+              value={vendorNotes}
+              onChange={(e) => setVendorNotes(e.target.value)}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+              placeholder="Work performed…"
+            />
+          </div>
+        </div>
+      )}
+
+      {request.status === 'RESOLVED' && request.cost != null && (
+        <p className="text-xs text-gray-500">Completed at a cost of {formatCurrency(request.cost)}{request.vendorNotes ? ` — ${request.vendorNotes}` : ''}</p>
+      )}
+
+      {request.vendorId && request.status !== 'RESOLVED' && (
+        <button
+          onClick={handleComplete}
+          disabled={complete.isPending}
+          className="text-xs px-3 py-1.5 rounded-lg bg-brand text-white hover:bg-brand/90 disabled:opacity-50"
+        >
+          {complete.isPending ? 'Saving…' : 'Mark Complete with Cost'}
+        </button>
+      )}
+    </div>
+  )
+}
 
 function DetailModal({ request, onClose }) {
   const update = useUpdateMaintenance()
@@ -83,6 +167,8 @@ function DetailModal({ request, onClose }) {
             ))}
           </div>
         </div>
+
+        <VendorAssignment request={request} />
       </div>
     </Modal>
   )
@@ -220,7 +306,7 @@ export default function MaintenancePage() {
         title="Delete Request"
         message="Are you sure you want to delete this maintenance request? This cannot be undone."
         confirmLabel="Delete"
-        variant="danger"
+        isDangerous
       />
     </div>
   )

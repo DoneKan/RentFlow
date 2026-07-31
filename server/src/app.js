@@ -23,6 +23,14 @@ const expenseRoutes = require('./routes/expense.routes');
 const reportRoutes = require('./routes/report.routes');
 const notificationRoutes = require('./routes/notification.routes');
 const maintenanceRoutes = require('./routes/maintenance.routes');
+const ownerRoutes = require('./routes/owner.routes');
+const vendorRoutes = require('./routes/vendor.routes');
+const leaseRoutes = require('./routes/lease.routes');
+const prospectRoutes = require('./routes/prospect.routes');
+const inspectionRoutes = require('./routes/inspection.routes');
+const budgetRoutes = require('./routes/budget.routes');
+const accountRoutes = require('./routes/account.routes');
+const ledgerRoutes = require('./routes/ledger.routes');
 
 const prisma = new PrismaClient();
 const app = express();
@@ -92,6 +100,14 @@ app.use(`${API}/expenses`, expenseRoutes);
 app.use(`${API}/reports`, reportRoutes);
 app.use(`${API}/notifications`, notificationRoutes);
 app.use(`${API}/maintenance`, maintenanceRoutes);
+app.use(`${API}/owner`, ownerRoutes);
+app.use(`${API}/vendors`, vendorRoutes);
+app.use(`${API}/lease-documents`, leaseRoutes);
+app.use(`${API}/prospects`, prospectRoutes);
+app.use(`${API}/inspections`, inspectionRoutes);
+app.use(`${API}/budgets`, budgetRoutes);
+app.use(`${API}/accounts`, accountRoutes);
+app.use(`${API}/ledger`, ledgerRoutes);
 
 // 404 handler
 app.use((req, res, next) => {

@@ -1,13 +1,15 @@
-import { useState } from 'react'
-import { Home, FileText, Wrench, CreditCard, Plus, Calendar, Shield, AlertCircle } from 'lucide-react'
+import { useState, useRef } from 'react'
+import { Home, FileText, Wrench, CreditCard, Plus, Calendar, Shield, AlertCircle, PenTool } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useMyPortal, useMaintenance, useCreateMaintenance, useUpdateMaintenance } from '../../hooks/useMaintenance'
+import { useLeaseDocuments, useSignLeaseDocument, openLeaseDocument } from '../../hooks/useLeaseDocuments'
 import { formatCurrency, formatDate } from '../../utils/formatters'
 import StatusBadge from '../../components/ui/StatusBadge'
 import Modal from '../../components/ui/Modal'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
+import SignaturePad from '../../components/ui/SignaturePad'
 
-const TABS = ['Overview', 'Statement', 'Maintenance']
+const TABS = ['Overview', 'Statement', 'Maintenance', 'Documents']
 
 const PRIORITY_COLORS = {
   LOW: 'bg-gray-100 text-gray-600',
@@ -289,6 +291,114 @@ function MaintenanceTab({ onNew }) {
   )
 }
 
+function SignModal({ document, onClose }) {
+  const padRef = useRef(null)
+  const sign = useSignLeaseDocument()
+  const [signerName, setSignerName] = useState('')
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    if (!signerName.trim()) return toast.error('Please type your full name')
+    if (padRef.current.isEmpty()) return toast.error('Please draw your signature')
+    try {
+      await sign.mutateAsync({
+        id: document.id,
+        data: { signatureDataUrl: padRef.current.getDataUrl(), signerName: signerName.trim() },
+      })
+      toast.success('Lease signed')
+      onClose()
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to sign lease')
+    }
+  }
+
+  return (
+    <Modal isOpen onClose={onClose} title="Sign Lease Agreement">
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <p className="text-sm text-gray-600">
+          Review the lease document before signing. By drawing your signature below you agree to the terms of this lease.
+        </p>
+        <button
+          type="button"
+          onClick={() => openLeaseDocument(document.id)}
+          className="text-sm text-brand hover:underline flex items-center gap-1.5"
+        >
+          <FileText className="h-4 w-4" /> View lease document
+        </button>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Full legal name</label>
+          <input
+            value={signerName}
+            onChange={(e) => setSignerName(e.target.value)}
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+            placeholder="As it appears on your ID"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Signature</label>
+          <SignaturePad ref={padRef} />
+        </div>
+        <div className="flex justify-end gap-3 pt-2">
+          <button type="button" onClick={onClose} className="px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={sign.isPending}
+            className="px-4 py-2 text-sm bg-brand text-white rounded-lg hover:bg-brand/90 disabled:opacity-50"
+          >
+            {sign.isPending ? 'Signing...' : 'Sign Lease'}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  )
+}
+
+function DocumentsTab() {
+  const { data: documents, isLoading } = useLeaseDocuments()
+  const [signing, setSigning] = useState(null)
+  const docs = documents || []
+
+  if (isLoading) return <LoadingSpinner />
+
+  return (
+    <div className="space-y-3">
+      {docs.length === 0 && (
+        <div className="text-center py-12 text-gray-400">
+          <FileText className="h-8 w-8 mx-auto mb-2 opacity-40" />
+          <p className="text-sm">No lease documents yet</p>
+        </div>
+      )}
+      {docs.map((doc) => (
+        <div key={doc.id} className="bg-white rounded-xl border border-gray-100 p-4 flex items-center justify-between gap-4">
+          <div>
+            <p className="font-medium text-sm text-gray-900">Lease Agreement v{doc.version}</p>
+            <p className="text-xs text-gray-500 mt-0.5">
+              {doc.status === 'SIGNED' ? `Signed ${formatDate(doc.signedAt)}` : `Sent ${formatDate(doc.createdAt)}`}
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <StatusBadge status={doc.status} />
+            <button onClick={() => openLeaseDocument(doc.id)} className="text-xs text-brand hover:underline">
+              View
+            </button>
+            {doc.status === 'SENT' && (
+              <button
+                onClick={() => setSigning(doc)}
+                className="flex items-center gap-1 text-xs bg-brand text-white px-3 py-1.5 rounded-lg hover:bg-brand/90"
+              >
+                <PenTool className="h-3 w-3" /> Sign
+              </button>
+            )}
+          </div>
+        </div>
+      ))}
+      {signing && <SignModal document={signing} onClose={() => setSigning(null)} />}
+    </div>
+  )
+}
+
 export default function TenantPortalPage() {
   const [activeTab, setActiveTab] = useState('Overview')
   const [showNewRequest, setShowNewRequest] = useState(false)
@@ -339,6 +449,7 @@ export default function TenantPortalPage() {
       {activeTab === 'Maintenance' && (
         <MaintenanceTab onNew={() => setShowNewRequest(true)} />
       )}
+      {activeTab === 'Documents' && <DocumentsTab />}
 
       {showNewRequest && <NewRequestModal onClose={() => setShowNewRequest(false)} />}
     </div>

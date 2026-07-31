@@ -25,8 +25,14 @@ model Organization {
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 
-  users      User[]
-  properties Property[]
+  users          User[]
+  properties     Property[]
+  vendors        Vendor[]
+  prospects      Prospect[]
+  inspections    Inspection[]
+  budgets        Budget[]
+  accounts       Account[]
+  journalEntries JournalEntry[]
 
   @@map("organizations")
 }
@@ -45,6 +51,7 @@ model User {
 
   organization        Organization?        @relation(fields: [organizationId], references: [id])
   managedProperties   Property[]           @relation("PropertyManager")
+  ownedProperties     Property[]           @relation("PropertyOwner")
   tenantProfile       Tenancy[]            @relation("TenantUser")
   invoices            Invoice[]            @relation("TenantInvoices")
   payments            Payment[]            @relation("TenantPayments")
@@ -70,21 +77,27 @@ model Property {
   longitude      Float?
   amenities      String   @default("[]")
   managerId      String
+  ownerId        String?
   organizationId String
   isActive       Boolean  @default(true)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  manager      User         @relation("PropertyManager", fields: [managerId], references: [id])
-  organization Organization @relation(fields: [organizationId], references: [id])
-  units        Unit[]
-  expenses     Expense[]
-  tenancies    Tenancy[]
-  invoices     Invoice[]
+  manager             User                 @relation("PropertyManager", fields: [managerId], references: [id])
+  owner               User?                @relation("PropertyOwner", fields: [ownerId], references: [id])
+  organization        Organization         @relation(fields: [organizationId], references: [id])
+  units               Unit[]
+  expenses            Expense[]
+  tenancies           Tenancy[]
+  invoices            Invoice[]
   maintenanceRequests MaintenanceRequest[]
+  inspections         Inspection[]
+  prospects           Prospect[]
+  budgets             Budget[]
 
   @@index([organizationId])
   @@index([code])
+  @@index([ownerId])
   @@map("properties")
 }
 
@@ -135,6 +148,7 @@ model Tenancy {
   property            Property             @relation(fields: [propertyId], references: [id])
   invoices            Invoice[]
   maintenanceRequests MaintenanceRequest[]
+  leaseDocuments      LeaseDocument[]
 
   @@index([tenantId])
   @@index([propertyId])
@@ -248,6 +262,10 @@ model MaintenanceRequest {
   description String
   priority    String    @default("MEDIUM")
   status      String    @default("OPEN")
+  vendorId    String?
+  assignedAt  DateTime?
+  cost        Decimal?
+  vendorNotes String?
   resolvedAt  DateTime?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -256,9 +274,229 @@ model MaintenanceRequest {
   unit     Unit     @relation(fields: [unitId], references: [id])
   property Property @relation(fields: [propertyId], references: [id])
   tenant   User     @relation("TenantMaintenance", fields: [tenantId], references: [id])
+  vendor   Vendor?  @relation(fields: [vendorId], references: [id])
 
   @@index([propertyId])
   @@index([tenantId])
   @@index([status])
+  @@index([vendorId])
   @@map("maintenance_requests")
+}
+
+model Vendor {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  category       String   @default("GENERAL")
+  phone          String?
+  email          String?
+  address        String?
+  notes          String?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization        Organization         @relation(fields: [organizationId], references: [id])
+  maintenanceRequests MaintenanceRequest[]
+
+  @@index([organizationId])
+  @@map("vendors")
+}
+
+model LeaseDocument {
+  id               String    @id @default(cuid())
+  tenancyId        String
+  fileUrl          String?
+  status           String    @default("DRAFT")
+  signatureDataUrl String?
+  signerName       String?
+  signerIp         String?
+  signedAt         DateTime?
+  version          Int       @default(1)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  tenancy Tenancy @relation(fields: [tenancyId], references: [id])
+
+  @@index([tenancyId])
+  @@index([status])
+  @@map("lease_documents")
+}
+
+model Prospect {
+  id                    String    @id @default(cuid())
+  organizationId        String
+  propertyId            String?
+  unitId                String?
+  name                  String
+  phone                 String
+  email                 String?
+  source                String    @default("OTHER")
+  stage                 String    @default("NEW")
+  showingDate           DateTime?
+  idNumber              String?
+  employerName          String?
+  monthlyIncome         Decimal?
+  previousLandlordName  String?
+  previousLandlordPhone String?
+  references            String?   @default("[]")
+  screeningStatus       String    @default("NOT_STARTED")
+  screeningNotes        String?
+  screenedById          String?
+  screenedAt            DateTime?
+  convertedTenancyId    String?
+  notes                 String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  property     Property?    @relation(fields: [propertyId], references: [id])
+
+  @@index([organizationId])
+  @@index([propertyId])
+  @@index([stage])
+  @@map("prospects")
+}
+
+model Inspection {
+  id             String    @id @default(cuid())
+  organizationId String
+  propertyId     String
+  unitId         String?
+  tenancyId      String?
+  type           String    @default("ROUTINE")
+  status         String    @default("SCHEDULED")
+  scheduledDate  DateTime?
+  completedDate  DateTime?
+  inspectorId    String?
+  overallNotes   String?
+  reportUrl      String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  organization Organization     @relation(fields: [organizationId], references: [id])
+  property     Property         @relation(fields: [propertyId], references: [id])
+  items        InspectionItem[]
+
+  @@index([organizationId])
+  @@index([propertyId])
+  @@index([tenancyId])
+  @@index([status])
+  @@map("inspections")
+}
+
+model InspectionItem {
+  id           String   @id @default(cuid())
+  inspectionId String
+  area         String
+  condition    String   @default("GOOD")
+  notes        String?
+  createdAt    DateTime @default(now())
+
+  inspection Inspection        @relation(fields: [inspectionId], references: [id])
+  photos     InspectionPhoto[]
+
+  @@index([inspectionId])
+  @@map("inspection_items")
+}
+
+model InspectionPhoto {
+  id               String   @id @default(cuid())
+  inspectionItemId String
+  url              String
+  caption          String?
+  createdAt        DateTime @default(now())
+
+  item InspectionItem @relation(fields: [inspectionItemId], references: [id])
+
+  @@index([inspectionItemId])
+  @@map("inspection_photos")
+}
+
+model Budget {
+  id             String   @id @default(cuid())
+  organizationId String
+  propertyId     String?
+  name           String
+  periodStart    DateTime
+  periodEnd      DateTime
+  currency       String   @default("UGX")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  property     Property?    @relation(fields: [propertyId], references: [id])
+  lines        BudgetLine[]
+
+  @@index([organizationId])
+  @@index([propertyId])
+  @@map("budgets")
+}
+
+model BudgetLine {
+  id            String   @id @default(cuid())
+  budgetId      String
+  category      String
+  plannedAmount Decimal
+  notes         String?
+  createdAt     DateTime @default(now())
+
+  budget Budget @relation(fields: [budgetId], references: [id])
+
+  @@index([budgetId])
+  @@map("budget_lines")
+}
+
+model Account {
+  id             String   @id @default(cuid())
+  organizationId String
+  code           String
+  name           String
+  type           String
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization  @relation(fields: [organizationId], references: [id])
+  lines        JournalLine[]
+
+  @@unique([organizationId, code])
+  @@index([organizationId])
+  @@map("accounts")
+}
+
+model JournalEntry {
+  id             String   @id @default(cuid())
+  organizationId String
+  date           DateTime @default(now())
+  memo           String?
+  reference      String?
+  sourceType     String   @default("MANUAL")
+  sourceId       String?
+  createdById    String?
+  createdAt      DateTime @default(now())
+
+  organization Organization  @relation(fields: [organizationId], references: [id])
+  lines        JournalLine[]
+
+  @@index([organizationId])
+  @@index([date])
+  @@index([sourceType, sourceId])
+  @@map("journal_entries")
+}
+
+model JournalLine {
+  id             String  @id @default(cuid())
+  journalEntryId String
+  accountId      String
+  propertyId     String?
+  debit          Decimal @default(0)
+  credit         Decimal @default(0)
+
+  journalEntry JournalEntry @relation(fields: [journalEntryId], references: [id])
+  account      Account      @relation(fields: [accountId], references: [id])
+
+  @@index([journalEntryId])
+  @@index([accountId])
+  @@map("journal_lines")
 }

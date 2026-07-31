@@ -31,6 +31,22 @@ export const useDeleteMaintenance = () => {
   })
 }
 
+export const useAssignVendor = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, vendorId }) => svc.assignMaintenanceVendor(id, vendorId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['maintenance'] }),
+  })
+}
+
+export const useCompleteMaintenance = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, data }) => svc.completeMaintenance(id, data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['maintenance'] }),
+  })
+}
+
 export const useMyPortal = () =>
   useQuery({
     queryKey: ['tenant-portal'],

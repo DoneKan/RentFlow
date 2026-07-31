@@ -158,6 +158,74 @@ async function update(req, res, next) {
   }
 }
 
+async function assign(req, res, next) {
+  try {
+    const { id } = req.params;
+    const { vendorId } = req.body;
+
+    const existing = await prisma.maintenanceRequest.findUnique({
+      where: { id },
+      include: { property: { select: { organizationId: true } } },
+    });
+    if (!existing) throw ApiError.notFound('Maintenance request not found');
+    if (existing.property.organizationId !== req.user.organizationId) throw ApiError.forbidden();
+
+    const vendor = await prisma.vendor.findFirst({
+      where: { id: vendorId, organizationId: req.user.organizationId },
+    });
+    if (!vendor) throw ApiError.notFound('Vendor not found');
+
+    const request = await prisma.maintenanceRequest.update({
+      where: { id },
+      data: { vendorId, assignedAt: new Date(), status: 'IN_PROGRESS' },
+      include: {
+        tenant: { select: { id: true, name: true } },
+        unit: { select: { id: true, unitNumber: true } },
+        property: { select: { id: true, name: true } },
+        vendor: { select: { id: true, name: true, category: true, phone: true } },
+      },
+    });
+
+    return ApiResponse.success(res, request, 'Vendor assigned');
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function complete(req, res, next) {
+  try {
+    const { id } = req.params;
+    const { cost, vendorNotes } = req.body;
+
+    const existing = await prisma.maintenanceRequest.findUnique({
+      where: { id },
+      include: { property: { select: { organizationId: true } } },
+    });
+    if (!existing) throw ApiError.notFound('Maintenance request not found');
+    if (existing.property.organizationId !== req.user.organizationId) throw ApiError.forbidden();
+
+    const request = await prisma.maintenanceRequest.update({
+      where: { id },
+      data: {
+        status: 'RESOLVED',
+        resolvedAt: new Date(),
+        ...(cost !== undefined && { cost }),
+        ...(vendorNotes !== undefined && { vendorNotes }),
+      },
+      include: {
+        tenant: { select: { id: true, name: true } },
+        unit: { select: { id: true, unitNumber: true } },
+        property: { select: { id: true, name: true } },
+        vendor: { select: { id: true, name: true, category: true } },
+      },
+    });
+
+    return ApiResponse.success(res, request, 'Marked as complete');
+  } catch (err) {
+    next(err);
+  }
+}
+
 async function remove(req, res, next) {
   try {
     const { id } = req.params;
@@ -178,4 +246,4 @@ async function remove(req, res, next) {
   }
 }
 
-module.exports = { list, getOne, create, update, remove };
+module.exports = { list, getOne, create, update, assign, complete, remove };

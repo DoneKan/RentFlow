@@ -1,7 +1,12 @@
 const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcryptjs');
+const { seedDefaultChartOfAccounts } = require('../src/utils/defaultChartOfAccounts');
+const { postPaymentEntry, postExpenseEntry } = require('../src/utils/ledgerPoster');
 
 const prisma = new PrismaClient();
+
+const PLACEHOLDER_SIGNATURE =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
 
 function daysAgo(n) {
   const d = new Date();
@@ -462,6 +467,160 @@ async function main() {
   }
   console.log(`✅ ${maintenanceDefs.length} maintenance requests created`);
 
+  // ── Owner account ─────────────────────────────────────────────────────────────
+  const ownerPw = await bcrypt.hash('Owner@1234', 10);
+  const owner = await prisma.user.upsert({
+    where: { email: 'owner@rentflow.ug' },
+    update: {},
+    create: { email: 'owner@rentflow.ug', password: ownerPw, name: 'Grace Kintu', phone: '+256772500001', role: 'OWNER', organizationId: org.id, isActive: true },
+  });
+  await prisma.property.update({ where: { id: propNakasero.id }, data: { ownerId: owner.id } });
+  console.log('✅ Owner account ready (owns Nakasero Heights)');
+
+  // ── Vendors ───────────────────────────────────────────────────────────────────
+  const vendorDefs = [
+    { name: 'Kampala Plumbing Services', category: 'PLUMBING', phone: '+256772000021', email: 'jobs@kplumbing.ug' },
+    { name: 'TechFix Uganda', category: 'ELECTRICAL', phone: '+256772000022', email: 'support@techfix.ug' },
+    { name: 'GreenThumb Landscapes', category: 'GENERAL', phone: '+256772000023', email: 'hello@greenthumb.ug' },
+  ];
+  const vendors = [];
+  for (const v of vendorDefs) {
+    const existing = await prisma.vendor.findFirst({ where: { organizationId: org.id, name: v.name } });
+    vendors.push(existing || await prisma.vendor.create({ data: { ...v, organizationId: org.id } }));
+  }
+  const resolvedRequest = await prisma.maintenanceRequest.findFirst({ where: { propertyId: propNakasero.id, status: 'RESOLVED' } });
+  if (resolvedRequest && !resolvedRequest.vendorId) {
+    await prisma.maintenanceRequest.update({
+      where: { id: resolvedRequest.id },
+      data: { vendorId: vendors[1].id, assignedAt: daysAgo(6), cost: 65000, vendorNotes: 'Replaced AC capacitor and cleaned filters.' },
+    });
+  }
+  console.log(`✅ ${vendors.length} vendors ready`);
+
+  // ── Prospects (leasing CRM + screening) ──────────────────────────────────────
+  const prospectDefs = [
+    { name: 'Michael Tumwine', phone: '+256772100001', source: 'WALK_IN', stage: 'NEW', propertyId: propNtinda.id, notes: 'Looking for commercial ground-floor space for a boutique.' },
+    {
+      name: 'Sarah Namutebi', phone: '+256772100002', email: 'sarah.namutebi@gmail.com', source: 'REFERRAL', stage: 'SCREENING', propertyId: propMuyenga.id,
+      idNumber: 'CM12345678AB', employerName: 'Stanbic Bank Uganda', monthlyIncome: 2500000, screeningStatus: 'IN_PROGRESS', screeningNotes: 'Awaiting employer verification letter.',
+    },
+    {
+      name: 'Peter Okello', phone: '+256772100003', email: 'peter.okello@gmail.com', source: 'ONLINE', stage: 'APPROVED', propertyId: propNakasero.id,
+      idNumber: 'CM98765432CD', employerName: 'MTN Uganda', monthlyIncome: 4000000, screeningStatus: 'APPROVED', screeningNotes: 'Verified employer and previous landlord reference — strong applicant.',
+      screenedById: manager.id, screenedAt: daysAgo(3),
+    },
+  ];
+  let prospectCount = 0;
+  for (const p of prospectDefs) {
+    const existing = await prisma.prospect.findFirst({ where: { organizationId: org.id, name: p.name } });
+    if (!existing) {
+      await prisma.prospect.create({ data: { ...p, organizationId: org.id } });
+      prospectCount++;
+    }
+  }
+  console.log(`✅ ${prospectCount} prospects created`);
+
+  // ── Lease documents (e-signature) ────────────────────────────────────────────
+  const leaseDocDefs = [
+    { tenancy: tenancies[0], status: 'SENT' },
+    { tenancy: tenancies[1], status: 'SIGNED', signerName: tenantData[1].name, signedAt: daysAgo(20) },
+  ];
+  let leaseDocCount = 0;
+  for (const d of leaseDocDefs) {
+    const existing = await prisma.leaseDocument.findFirst({ where: { tenancyId: d.tenancy.id } });
+    if (!existing) {
+      await prisma.leaseDocument.create({
+        data: {
+          tenancyId: d.tenancy.id,
+          status: d.status,
+          version: 1,
+          ...(d.status === 'SIGNED' && { signatureDataUrl: PLACEHOLDER_SIGNATURE, signerName: d.signerName, signerIp: '102.89.44.10', signedAt: d.signedAt }),
+        },
+      });
+      leaseDocCount++;
+    }
+  }
+  console.log(`✅ ${leaseDocCount} lease documents created`);
+
+  // ── Inspection (photo checklist) ─────────────────────────────────────────────
+  let inspection = await prisma.inspection.findFirst({ where: { organizationId: org.id, propertyId: propMuyenga.id, type: 'MOVE_OUT' } });
+  if (!inspection) {
+    inspection = await prisma.inspection.create({
+      data: {
+        organizationId: org.id,
+        propertyId: propMuyenga.id,
+        unitId: m2b.id,
+        type: 'MOVE_OUT',
+        status: 'COMPLETED',
+        scheduledDate: daysAgo(11),
+        completedDate: daysAgo(10),
+        inspectorId: manager2.id,
+        overallNotes: 'Unit in good overall condition. Minor wear in bathroom grouting — flagged for touch-up before next tenancy.',
+      },
+    });
+    await prisma.inspectionItem.createMany({
+      data: [
+        { inspectionId: inspection.id, area: 'Living Room', condition: 'GOOD', notes: 'Walls and flooring in good condition.' },
+        { inspectionId: inspection.id, area: 'Kitchen', condition: 'GOOD', notes: 'Appliances functional, no damage.' },
+        { inspectionId: inspection.id, area: 'Bathroom', condition: 'FAIR', notes: 'Grouting worn around the tub — recommend re-sealing.' },
+      ],
+    });
+    console.log('✅ Inspection with checklist created');
+  }
+
+  // ── Chart of accounts + general ledger ───────────────────────────────────────
+  await seedDefaultChartOfAccounts(prisma, org.id);
+  console.log('✅ Chart of accounts seeded');
+
+  const completedPayments = await prisma.payment.findMany({
+    where: { tenant: { organizationId: org.id }, status: 'COMPLETED' },
+    include: { invoice: { select: { propertyId: true } } },
+  });
+  let postedPayments = 0;
+  for (const p of completedPayments) {
+    const alreadyPosted = await prisma.journalEntry.findFirst({ where: { sourceType: 'PAYMENT', sourceId: p.id } });
+    if (!alreadyPosted) {
+      await postPaymentEntry(prisma, { payment: p, organizationId: org.id, propertyId: p.invoice.propertyId });
+      postedPayments++;
+    }
+  }
+
+  const allExpenses = await prisma.expense.findMany({ where: { property: { organizationId: org.id } } });
+  let postedExpenses = 0;
+  for (const e of allExpenses) {
+    const alreadyPosted = await prisma.journalEntry.findFirst({ where: { sourceType: 'EXPENSE', sourceId: e.id } });
+    if (!alreadyPosted) {
+      await postExpenseEntry(prisma, { expense: e, organizationId: org.id });
+      postedExpenses++;
+    }
+  }
+  console.log(`✅ Journal entries posted for ${postedPayments} payments + ${postedExpenses} expenses`);
+
+  // ── Budget ────────────────────────────────────────────────────────────────────
+  const existingBudget = await prisma.budget.findFirst({ where: { organizationId: org.id, propertyId: propNakasero.id } });
+  if (!existingBudget) {
+    await prisma.budget.create({
+      data: {
+        organizationId: org.id,
+        propertyId: propNakasero.id,
+        name: 'Nakasero Heights — Q2 2026 Operating Budget',
+        periodStart: monthsAgo(3, 1),
+        periodEnd: monthsAgo(0, 28),
+        currency: 'UGX',
+        lines: {
+          create: [
+            { category: 'RENTAL_INCOME', plannedAmount: 8600000, notes: 'Combined monthly rent across all units' },
+            { category: 'UTILITIES', plannedAmount: 700000 },
+            { category: 'SECURITY', plannedAmount: 850000 },
+            { category: 'MAINTENANCE', plannedAmount: 300000 },
+            { category: 'KCCA_TAX', plannedAmount: 1200000 },
+          ],
+        },
+      },
+    });
+    console.log('✅ Budget created');
+  }
+
   // ── Summary ───────────────────────────────────────────────────────────────────
   console.log('\n🎉 Showcase seed complete!\n');
   console.log('📊 Portfolio overview:');
@@ -470,11 +629,14 @@ async function main() {
   console.log('   3 overdue invoices · 7 current invoices awaiting payment');
   console.log('   24 expense records across all categories');
   console.log('   4 maintenance requests (1 resolved, 1 in-progress, 2 open)');
+  console.log('   3 vendors · 3 prospects · 2 lease documents · 1 inspection · 1 budget');
+  console.log('   Chart of accounts + journal entries for every completed payment and expense');
   console.log('\n📋 Login credentials:');
   console.log('   Admin:    admin@rentflow.ug    / Admin@1234');
   console.log('   Manager:  manager@rentflow.ug  / Manager@1234');
   console.log('   Manager2: manager2@rentflow.ug / Manager@1234');
   console.log('   Tenant:   tenant@rentflow.ug   / Tenant@1234');
+  console.log('   Owner:    owner@rentflow.ug    / Owner@1234');
 }
 
 main()

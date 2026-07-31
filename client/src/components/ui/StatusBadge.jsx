@@ -19,6 +19,18 @@ const STATUS_LABELS = {
   IN_PROGRESS: 'In Progress',
   RESOLVED: 'Resolved',
   CLOSED: 'Closed',
+  SIGNED: 'Signed',
+  DECLINED: 'Declined',
+  NEW: 'New',
+  CONTACTED: 'Contacted',
+  SHOWING_SCHEDULED: 'Showing Scheduled',
+  SCREENING: 'Screening',
+  APPROVED: 'Approved',
+  REJECTED: 'Rejected',
+  CONVERTED: 'Converted',
+  LOST: 'Lost',
+  NOT_STARTED: 'Not Started',
+  SCHEDULED: 'Scheduled',
 }
 
 export default function StatusBadge({ status }) {

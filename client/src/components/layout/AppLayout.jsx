@@ -16,6 +16,13 @@ import {
   User,
   Wrench,
   Home,
+  HardHat,
+  FileSignature,
+  UserPlus,
+  ClipboardCheck,
+  Wallet,
+  Landmark,
+  BookOpen,
 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { getInitials } from '../../utils/formatters'
@@ -25,10 +32,17 @@ const MANAGER_NAV = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/properties', icon: Building2, label: 'Properties' },
   { to: '/tenants', icon: Users, label: 'Tenants' },
+  { to: '/prospects', icon: UserPlus, label: 'Prospects' },
   { to: '/invoices', icon: FileText, label: 'Invoices' },
+  { to: '/leases', icon: FileSignature, label: 'Lease Documents' },
   { to: '/payments', icon: CreditCard, label: 'Payments' },
   { to: '/expenses', icon: Receipt, label: 'Expenses' },
   { to: '/maintenance', icon: Wrench, label: 'Maintenance' },
+  { to: '/vendors', icon: HardHat, label: 'Vendors' },
+  { to: '/inspections', icon: ClipboardCheck, label: 'Inspections' },
+  { to: '/budgets', icon: Wallet, label: 'Budgets' },
+  { to: '/accounting/chart-of-accounts', icon: Landmark, label: 'Chart of Accounts' },
+  { to: '/accounting/ledger', icon: BookOpen, label: 'General Ledger' },
   { to: '/reports', icon: BarChart3, label: 'Reports' },
   { to: '/settings', icon: Settings, label: 'Settings' },
 ]
@@ -38,10 +52,16 @@ const TENANT_NAV = [
   { to: '/settings', icon: Settings, label: 'Settings' },
 ]
 
+const OWNER_NAV = [
+  { to: '/owner-portal', icon: Home, label: 'My Properties' },
+  { to: '/settings', icon: Settings, label: 'Settings' },
+]
+
 function Sidebar({ onClose }) {
   const { user, logout } = useAuth()
   const isTenant = user?.role === 'TENANT'
-  const navItems = isTenant ? TENANT_NAV : MANAGER_NAV
+  const isOwner = user?.role === 'OWNER'
+  const navItems = isTenant ? TENANT_NAV : isOwner ? OWNER_NAV : MANAGER_NAV
 
   return (
     <div className="flex h-full flex-col bg-brand text-white w-64">
@@ -52,7 +72,7 @@ function Sidebar({ onClose }) {
             <span className="text-xl font-bold tracking-tight">RentFlow</span>
           </div>
           <p className="text-[11px] text-white/50 mt-0.5 ml-8">
-            {isTenant ? 'Tenant Portal' : 'Property Management'}
+            {isTenant ? 'Tenant Portal' : isOwner ? 'Owner Portal' : 'Property Management'}
           </p>
         </div>
         {onClose && (

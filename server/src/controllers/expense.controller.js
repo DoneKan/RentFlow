@@ -1,6 +1,7 @@
 const { PrismaClient } = require('@prisma/client');
 const ApiError = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
+const { postExpenseEntry } = require('../utils/ledgerPoster');
 
 const prisma = new PrismaClient();
 
@@ -107,6 +108,8 @@ async function create(req, res, next) {
       },
       include: { property: { select: { id: true, name: true } } },
     });
+
+    postExpenseEntry(prisma, { expense, organizationId: req.user.organizationId });
 
     return ApiResponse.created(res, expense, 'Expense logged');
   } catch (err) {

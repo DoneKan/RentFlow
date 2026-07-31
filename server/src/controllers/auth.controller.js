@@ -4,6 +4,7 @@ const { PrismaClient } = require('@prisma/client');
 const ApiError = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
 const { sendWelcomeEmail } = require('../utils/emailService');
+const { seedDefaultChartOfAccounts } = require('../utils/defaultChartOfAccounts');
 const logger = require('../utils/logger');
 
 const prisma = new PrismaClient();
@@ -80,6 +81,8 @@ async function register(req, res, next) {
         },
         include: { organization: true },
       });
+
+      await seedDefaultChartOfAccounts(tx, org.id);
 
       return { user, org };
     });

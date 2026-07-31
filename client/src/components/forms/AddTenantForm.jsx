@@ -10,11 +10,11 @@ import { formatCurrency } from '../../utils/formatters'
 
 const STEPS = ['Personal Info', 'Unit Assignment', 'Tenancy Terms']
 
-export default function AddTenantForm({ onClose, defaultPropertyId }) {
+export default function AddTenantForm({ onClose, defaultPropertyId, defaultName, defaultEmail, defaultPhone, onSuccess }) {
   const create = useCreateTenant()
   const [step, setStep] = useState(0)
   const [form, setForm] = useState({
-    name: '', email: '', phone: '',
+    name: defaultName || '', email: defaultEmail || '', phone: defaultPhone || '',
     propertyId: defaultPropertyId || '',
     unitId: '',
     startDate: new Date().toISOString().split('T')[0],
@@ -82,7 +82,7 @@ export default function AddTenantForm({ onClose, defaultPropertyId }) {
         form.notes ? `Notes: ${form.notes}` : '',
       ].filter(Boolean).join(' | ')
 
-      await create.mutateAsync({
+      const res = await create.mutateAsync({
         name: form.name, email: form.email, phone: form.phone,
         propertyId: form.propertyId, unitId: form.unitId,
         startDate: form.startDate, paymentPeriod: form.paymentPeriod,
@@ -91,6 +91,7 @@ export default function AddTenantForm({ onClose, defaultPropertyId }) {
         notes,
       })
       toast.success('Tenant added successfully!')
+      onSuccess?.(res.data?.data)
       onClose()
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to add tenant')

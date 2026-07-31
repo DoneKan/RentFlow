@@ -4,6 +4,7 @@ const ApiResponse = require('../utils/ApiResponse');
 const { generateReceiptNumber } = require('../utils/generateCode');
 const { generateReceipt } = require('../utils/pdfGenerator');
 const { sendPaymentReceipt } = require('../utils/emailService');
+const { postPaymentEntry } = require('../utils/ledgerPoster');
 const mtnService = require('../services/mtnService');
 const airtelService = require('../services/airtelService');
 const logger = require('../utils/logger');
@@ -30,15 +31,22 @@ async function completePayment(paymentId) {
   });
   if (!payment) return;
 
+  const paidAt = new Date();
   await prisma.$transaction(async (tx) => {
     await tx.payment.update({
       where: { id: paymentId },
-      data: { status: 'COMPLETED', paidAt: new Date() },
+      data: { status: 'COMPLETED', paidAt },
     });
     await tx.invoice.update({
       where: { id: payment.invoiceId },
-      data: { status: 'PAID', paidAt: new Date() },
+      data: { status: 'PAID', paidAt },
     });
+  });
+
+  postPaymentEntry(prisma, {
+    payment: { ...payment, paidAt },
+    organizationId: payment.invoice.property.organizationId,
+    propertyId: payment.invoice.propertyId,
   });
 
   try {
@@ -129,6 +137,12 @@ async function recordManual(req, res, next) {
         data: { status: 'PAID', paidAt: new Date() },
       });
       return p;
+    });
+
+    postPaymentEntry(prisma, {
+      payment,
+      organizationId: invoice.property.organizationId,
+      propertyId: invoice.propertyId,
     });
 
     try {

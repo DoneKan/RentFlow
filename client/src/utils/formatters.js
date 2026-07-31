@@ -47,6 +47,18 @@ export function getStatusBadgeClass(status) {
     OPEN: 'badge-overdue',
     RESOLVED: 'badge-paid',
     CLOSED: 'badge-draft',
+    SIGNED: 'badge-paid',
+    DECLINED: 'badge-overdue',
+    NEW: 'badge-pending',
+    CONTACTED: 'badge-pending',
+    SHOWING_SCHEDULED: 'badge-pending',
+    SCREENING: 'badge-pending',
+    APPROVED: 'badge-paid',
+    REJECTED: 'badge-overdue',
+    CONVERTED: 'badge-paid',
+    LOST: 'badge-draft',
+    NOT_STARTED: 'badge-draft',
+    SCHEDULED: 'badge-pending',
   }
   return map[status] || 'badge-draft'
 }
@@ -59,6 +71,14 @@ export function getPaymentMethodLabel(method) {
     CASH: 'Cash',
   }
   return map[method] || method
+}
+
+export function getUploadUrl(path) {
+  if (!path) return path
+  const apiUrl = import.meta.env.VITE_API_URL
+  if (!apiUrl) return path
+  const origin = apiUrl.replace(/\/api\/v\d+\/?$/, '')
+  return `${origin}${path}`
 }
 
 export function getInitials(name) {

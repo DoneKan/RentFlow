@@ -1,17 +1,6 @@
 const nodemailer = require('nodemailer');
 const logger = require('./logger');
-
-function formatCurrency(amount, currency = 'UGX') {
-  return `${currency} ${Number(amount).toLocaleString('en-UG', { minimumFractionDigits: 0 })}`;
-}
-
-function formatDate(date) {
-  return new Date(date).toLocaleDateString('en-UG', {
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric',
-  });
-}
+const { formatCurrency, formatDate } = require('./format');
 
 function createTransporter() {
   return nodemailer.createTransport({
