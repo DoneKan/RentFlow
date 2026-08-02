@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
-import { useRecordPayment } from '../../hooks/usePayments'
+import { useRecordPayment, useInitiateMTN, useInitiateAirtel } from '../../hooks/usePayments'
 import { getTenants } from '../../services/tenant.service'
 import { getInvoices } from '../../services/invoice.service'
 import { PAYMENT_METHODS } from '../../utils/constants'
@@ -9,6 +9,8 @@ import { formatCurrency, formatDate } from '../../utils/formatters'
 
 export default function RecordPaymentForm({ onClose, defaultTenantId, defaultInvoiceId }) {
   const record = useRecordPayment()
+  const initiateMtn = useInitiateMTN()
+  const initiateAirtel = useInitiateAirtel()
   const [form, setForm] = useState({
     tenantId: defaultTenantId || '',
     invoiceId: defaultInvoiceId || '',
@@ -55,18 +57,32 @@ export default function RecordPaymentForm({ onClose, defaultTenantId, defaultInv
     e.preventDefault()
     if (!form.invoiceId) { toast.error('Please select an invoice'); return }
     if (!form.amount) { toast.error('Amount is required'); return }
+    if (isMobile && !form.mobileNumber) { toast.error('Mobile number is required'); return }
+
     try {
-      await record.mutateAsync({
-        ...form,
-        amount: parseFloat(form.amount),
-        mobileNumber: isMobile ? form.mobileNumber : undefined,
-      })
-      toast.success('Payment recorded successfully!')
+      if (form.method === 'MTN_MOMO') {
+        const res = await initiateMtn.mutateAsync({ invoiceId: form.invoiceId, mobileNumber: form.mobileNumber })
+        toast.success(res.message || 'MTN Mobile Money payment initiated — awaiting approval')
+      } else if (form.method === 'AIRTEL_MONEY') {
+        const res = await initiateAirtel.mutateAsync({ invoiceId: form.invoiceId, mobileNumber: form.mobileNumber })
+        toast.success(res.message || 'Airtel Money payment initiated — awaiting approval')
+      } else {
+        await record.mutateAsync({
+          invoiceId: form.invoiceId,
+          amount: parseFloat(form.amount),
+          method: form.method,
+          notes: form.transactionReference ? `Ref: ${form.transactionReference}. ${form.notes}` : form.notes,
+          paidAt: form.paidAt,
+        })
+        toast.success('Payment recorded successfully!')
+      }
       onClose()
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to record payment')
     }
   }
+
+  const submitting = record.isPending || initiateMtn.isPending || initiateAirtel.isPending
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
@@ -147,8 +163,8 @@ export default function RecordPaymentForm({ onClose, defaultTenantId, defaultInv
 
       <div className="flex gap-3 pt-1">
         <button type="button" onClick={onClose} className="btn-secondary flex-1">Cancel</button>
-        <button type="submit" disabled={record.isPending} className="btn-primary flex-1">
-          {record.isPending ? 'Processing…' : 'Record Payment'}
+        <button type="submit" disabled={submitting} className="btn-primary flex-1">
+          {submitting ? 'Processing…' : isMobile ? 'Initiate Payment' : 'Record Payment'}
         </button>
       </div>
     </form>

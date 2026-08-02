@@ -38,3 +38,11 @@ export function useInitiateMTN() {
     onSuccess: () => qc.invalidateQueries({ queryKey: PAYMENTS_KEY }),
   })
 }
+
+export function useInitiateAirtel() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: paymentService.initiateAirtel,
+    onSuccess: () => qc.invalidateQueries({ queryKey: PAYMENTS_KEY }),
+  })
+}
