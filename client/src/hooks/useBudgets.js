@@ -19,6 +19,7 @@ export const useBudgetVariance = (id) =>
     queryKey: ['budgets', id, 'variance'],
     queryFn: () => svc.getBudgetVariance(id).then((r) => r.data.data),
     enabled: !!id,
+    refetchOnMount: 'always',
   })
 
 export const useCreateBudget = () => {

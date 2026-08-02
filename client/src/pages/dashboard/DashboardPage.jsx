@@ -36,6 +36,7 @@ export default function DashboardPage() {
     queryKey: ['dashboard'],
     queryFn: getDashboard,
     select: (r) => r.data,
+    refetchOnMount: 'always',
   })
 
   if (isLoading) return <LoadingSpinner fullPage />

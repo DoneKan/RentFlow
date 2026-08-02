@@ -6,6 +6,7 @@ import PageHeader from '../../components/ui/PageHeader'
 import DataTable from '../../components/ui/DataTable'
 import StatCard from '../../components/ui/StatCard'
 import ConfirmDialog from '../../components/ui/ConfirmDialog'
+import Modal from '../../components/ui/Modal'
 import LogExpenseForm from '../../components/forms/LogExpenseForm'
 import StatusBadge from '../../components/ui/StatusBadge'
 import { getExpenses, getExpenseSummary, deleteExpense } from '../../services/expense.service'
@@ -47,7 +48,7 @@ export default function ExpensesPage() {
   })
 
   const { data: summaryRes } = useQuery({
-    queryKey: ['expenses-summary'],
+    queryKey: ['expense-summary'],
     queryFn: () => getExpenseSummary(),
     select: (r) => r.data || {},
   })
@@ -56,7 +57,7 @@ export default function ExpensesPage() {
     mutationFn: deleteExpense,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['expenses'] })
-      queryClient.invalidateQueries({ queryKey: ['expenses-summary'] })
+      queryClient.invalidateQueries({ queryKey: ['expense-summary'] })
       toast.success('Expense deleted')
       setDeleteId(null)
     },
@@ -154,17 +155,20 @@ export default function ExpensesPage() {
         />
       </div>
 
-      <LogExpenseForm
+      <Modal
         isOpen={showForm}
         onClose={() => { setShowForm(false); setEditExpense(null) }}
-        expense={editExpense}
-        onSuccess={() => {
-          queryClient.invalidateQueries({ queryKey: ['expenses'] })
-          queryClient.invalidateQueries({ queryKey: ['expenses-summary'] })
-          setShowForm(false)
-          setEditExpense(null)
-        }}
-      />
+        title={editExpense ? 'Edit Expense' : 'Log Expense'}
+      >
+        <LogExpenseForm
+          onClose={() => { setShowForm(false); setEditExpense(null) }}
+          expense={editExpense}
+          onSuccess={() => {
+            queryClient.invalidateQueries({ queryKey: ['expenses'] })
+            queryClient.invalidateQueries({ queryKey: ['expense-summary'] })
+          }}
+        />
+      </Modal>
 
       <ConfirmDialog
         isOpen={!!deleteId}

@@ -2,19 +2,22 @@ import { useState } from 'react'
 import { Paperclip } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useQuery } from '@tanstack/react-query'
-import { useCreateExpense } from '../../hooks/useExpenses'
+import { useCreateExpense, useUpdateExpense } from '../../hooks/useExpenses'
 import { getProperties } from '../../services/property.service'
 import { EXPENSE_CATEGORIES } from '../../utils/constants'
 
-export default function LogExpenseForm({ onClose, defaultPropertyId }) {
+export default function LogExpenseForm({ onClose, defaultPropertyId, expense, onSuccess }) {
+  const isEditing = !!expense
   const create = useCreateExpense()
+  const update = useUpdateExpense()
+  const saving = isEditing ? update.isPending : create.isPending
   const [form, setForm] = useState({
-    propertyId: defaultPropertyId || '',
-    category: 'UTILITIES',
-    amount: '',
-    description: '',
-    vendor: '',
-    date: new Date().toISOString().split('T')[0],
+    propertyId: expense?.propertyId || defaultPropertyId || '',
+    category: expense?.category || 'UTILITIES',
+    amount: expense?.amount != null ? String(expense.amount) : '',
+    description: expense?.description || '',
+    vendor: expense?.vendor || '',
+    date: expense?.date ? expense.date.split('T')[0] : new Date().toISOString().split('T')[0],
   })
   const [file, setFile] = useState(null)
 
@@ -43,11 +46,17 @@ export default function LogExpenseForm({ onClose, defaultPropertyId }) {
     }
 
     try {
-      await create.mutateAsync(payload)
-      toast.success('Expense logged!')
+      if (isEditing) {
+        await update.mutateAsync({ id: expense.id, data: payload })
+        toast.success('Expense updated!')
+      } else {
+        await create.mutateAsync(payload)
+        toast.success('Expense logged!')
+      }
+      onSuccess?.()
       onClose()
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to log expense')
+      toast.error(err.response?.data?.message || `Failed to ${isEditing ? 'update' : 'log'} expense`)
     }
   }
 
@@ -100,8 +109,8 @@ export default function LogExpenseForm({ onClose, defaultPropertyId }) {
 
       <div className="flex gap-3 pt-1">
         <button type="button" onClick={onClose} className="btn-secondary flex-1">Cancel</button>
-        <button type="submit" disabled={create.isPending} className="btn-primary flex-1">
-          {create.isPending ? 'Logging…' : 'Log Expense'}
+        <button type="submit" disabled={saving} className="btn-primary flex-1">
+          {saving ? (isEditing ? 'Updating…' : 'Logging…') : (isEditing ? 'Update Expense' : 'Log Expense')}
         </button>
       </div>
     </form>

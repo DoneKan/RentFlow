@@ -34,7 +34,10 @@ export function useUpdateExpense() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: ({ id, data }) => expenseService.updateExpense(id, data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: EXPENSES_KEY }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: EXPENSES_KEY })
+      qc.invalidateQueries({ queryKey: ['expense-summary'] })
+    },
   })
 }
 

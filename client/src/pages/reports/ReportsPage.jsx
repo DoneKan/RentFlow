@@ -86,6 +86,7 @@ export default function ReportsPage() {
     queryFn: () => getFinancialOverview(params),
     select: (r) => r.data,
     enabled: tab === 'overview',
+    refetchOnMount: 'always',
   })
 
   const { data: byProperty, isLoading: byPropertyLoading } = useQuery({
@@ -93,6 +94,7 @@ export default function ReportsPage() {
     queryFn: () => getFinancialByProperty(params),
     select: (r) => r.data,
     enabled: tab === 'by-property',
+    refetchOnMount: 'always',
   })
 
   const pieData = (overview?.expenses?.byCategory || [])

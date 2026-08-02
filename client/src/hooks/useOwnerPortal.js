@@ -5,6 +5,7 @@ export const useMyOwnerPortal = () =>
   useQuery({
     queryKey: ['owner-portal'],
     queryFn: () => svc.getMyOwnerPortal().then((r) => r.data.data),
+    refetchOnMount: 'always',
   })
 
 export const useOwnerPropertyStatement = (propertyId, params) =>
@@ -12,4 +13,5 @@ export const useOwnerPropertyStatement = (propertyId, params) =>
     queryKey: ['owner-portal', 'statement', propertyId, params],
     queryFn: () => svc.getOwnerPropertyStatement(propertyId, params).then((r) => r.data.data),
     enabled: !!propertyId,
+    refetchOnMount: 'always',
   })

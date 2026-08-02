@@ -104,6 +104,7 @@ export default function SettingsPage() {
     queryFn: () => api.get('/reports/subscription'),
     select: (r) => r.data?.data,
     enabled: activeTab === 'subscription',
+    refetchOnMount: 'always',
   })
 
   const currentPlanId = subData?.plan || user?.organization?.plan || 'FREE'
