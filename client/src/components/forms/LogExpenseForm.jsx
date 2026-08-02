@@ -26,7 +26,7 @@ export default function LogExpenseForm({ onClose, defaultPropertyId, expense, on
   const { data: propertiesData } = useQuery({
     queryKey: ['properties', 'all'],
     queryFn: () => getProperties({ limit: 200 }),
-    select: (r) => r.data?.data || [],
+    select: (r) => r.data || [],
     staleTime: 0,
   })
 

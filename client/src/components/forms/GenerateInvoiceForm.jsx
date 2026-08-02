@@ -20,7 +20,7 @@ export default function GenerateInvoiceForm({ onClose, defaultTenantId }) {
   const { data: tenancies } = useQuery({
     queryKey: ['tenants'],
     queryFn: getTenants,
-    select: (r) => r.data?.data || [],
+    select: (r) => r.data || [],
   })
 
   // If defaultTenantId is a USER ID, find the matching tenancy

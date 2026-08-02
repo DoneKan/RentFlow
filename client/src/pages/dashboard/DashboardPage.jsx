@@ -41,11 +41,30 @@ export default function DashboardPage() {
 
   if (isLoading) return <LoadingSpinner fullPage />
 
-  const stats = data?.stats || {}
+  const properties = data?.properties || {}
+  const units = data?.units || {}
+  const tenants = data?.tenants || {}
+  const financials = data?.financials || {}
+  const invoicesSummary = data?.invoices || {}
   const recentPayments = data?.recentPayments || []
   const overdueInvoices = data?.overdueInvoices || []
-  const revenueChart = data?.revenueChart || []
-  const occupancyData = data?.occupancyData || []
+  const revenueChart = data?.trend || []
+  const occupancyData = units.total > 0
+    ? [
+        { name: 'Occupied', value: units.occupied || 0 },
+        { name: 'Vacant', value: units.vacant || 0 },
+      ]
+    : []
+
+  const stats = {
+    totalProperties: properties.total,
+    totalUnits: units.total,
+    activeTenants: tenants.active,
+    occupancyRate: units.occupancyRate,
+    monthlyRevenue: financials.monthlyRevenue,
+    outstanding: financials.outstanding,
+    overdueCount: invoicesSummary.overdue,
+  }
 
   const quickActions = [
     { icon: Plus, label: 'Add Property', color: 'bg-brand', onClick: () => navigate('/properties') },

@@ -34,14 +34,14 @@ export default function AddTenantForm({ onClose, defaultPropertyId, defaultName,
   const { data: propertiesData } = useQuery({
     queryKey: ['properties', 'all'],
     queryFn: () => getProperties({ limit: 200 }),
-    select: (r) => r.data?.data || [],
+    select: (r) => r.data || [],
     staleTime: 0,
   })
 
   const { data: unitsData } = useQuery({
     queryKey: ['property-units-vacant', form.propertyId],
     queryFn: () => getPropertyUnits(form.propertyId),
-    select: (r) => (r.data?.units || []).filter((u) => u.status === 'VACANT'),
+    select: (r) => (r.data || []).filter((u) => u.status === 'VACANT'),
     enabled: !!form.propertyId,
   })
 

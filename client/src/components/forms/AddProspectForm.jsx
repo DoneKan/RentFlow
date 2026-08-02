@@ -13,7 +13,7 @@ export default function AddProspectForm({ onClose }) {
   const { data: properties } = useQuery({
     queryKey: ['properties', 'all'],
     queryFn: () => getProperties({ limit: 200 }),
-    select: (r) => r.data?.data || [],
+    select: (r) => r.data || [],
   })
 
   const set = (k, v) => setForm((p) => ({ ...p, [k]: v }))

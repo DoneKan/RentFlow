@@ -16,7 +16,7 @@ export default function TenantsPage() {
   const [search, setSearch] = useState('')
 
   const { data, isLoading } = useTenants()
-  const tenants = data?.tenants || []
+  const tenants = data || []
 
   const filtered = tenants.filter((t) => {
     if (!search) return true

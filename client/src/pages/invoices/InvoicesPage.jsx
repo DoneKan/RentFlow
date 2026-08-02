@@ -24,7 +24,7 @@ export default function InvoicesPage() {
   const sendReminder = useSendReminder()
   const cancelInvoice = useCancelInvoice()
 
-  const invoices = data?.invoices || []
+  const invoices = data || []
 
   const handleSend = async (id, e) => {
     e.stopPropagation()

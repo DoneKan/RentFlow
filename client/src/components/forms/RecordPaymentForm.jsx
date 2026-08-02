@@ -25,13 +25,13 @@ export default function RecordPaymentForm({ onClose, defaultTenantId, defaultInv
   const { data: tenantsData } = useQuery({
     queryKey: ['tenants'],
     queryFn: getTenants,
-    select: (r) => r.data?.data || [],
+    select: (r) => r.data || [],
   })
 
   const { data: invoicesData } = useQuery({
     queryKey: ['invoices', { tenantId: form.tenantId, status: 'SENT,OVERDUE' }],
     queryFn: () => getInvoices({ tenantId: form.tenantId }),
-    select: (r) => r.data?.data?.filter((i) => ['SENT', 'OVERDUE'].includes(i.status)) || [],
+    select: (r) => (r.data || []).filter((i) => ['SENT', 'OVERDUE'].includes(i.status)),
     enabled: !!form.tenantId,
   })
 

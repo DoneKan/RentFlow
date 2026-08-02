@@ -110,6 +110,11 @@ async function dashboard(req, res, next) {
     const monthlyExpensesTotal = Number(monthlyExpenses._sum.amount || 0);
     const netIncome = monthlyRevenue - monthlyExpensesTotal;
 
+    // Reuse the same overview computation the Reports page uses, for the
+    // true outstanding balance (not just the 10 overdue invoices shown here)
+    // and the 6-month revenue/expense trend.
+    const overview = await computeOverview(orgId, monthStart, monthEnd);
+
     return ApiResponse.success(res, {
       properties: { total: totalProperties },
       units: { total: totalUnits, occupied: occupiedUnits, vacant: totalUnits - occupiedUnits, occupancyRate },
@@ -119,10 +124,12 @@ async function dashboard(req, res, next) {
         monthlyExpenses: monthlyExpensesTotal,
         netIncome,
         paymentsThisMonth: monthlyPayments._count,
+        outstanding: overview.outstanding.total,
       },
       invoices: { overdue: overdueInvoices.length, pending: pendingInvoices },
       overdueInvoices,
       recentPayments,
+      trend: overview.trend,
     });
   } catch (err) {
     next(err);

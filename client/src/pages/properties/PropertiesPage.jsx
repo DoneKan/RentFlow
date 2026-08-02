@@ -74,7 +74,7 @@ export default function PropertiesPage() {
   const [typeFilter, setTypeFilter] = useState('ALL')
 
   const { data, isLoading } = useProperties()
-  const properties = data?.properties || []
+  const properties = data || []
 
   const filtered = properties.filter((p) => {
     const matchSearch =
