@@ -31,8 +31,8 @@ export default function TenantDetailPage() {
   const { data: invoicesData, isLoading: invLoading } = useInvoices({ tenantId: id })
   const { data: paymentsData, isLoading: payLoading } = usePayments({ tenantId: id })
 
-  const invoices = invoicesData?.invoices || []
-  const payments = paymentsData?.payments || []
+  const invoices = invoicesData || []
+  const payments = paymentsData || []
 
   if (isLoading) return <LoadingSpinner fullPage />
   if (!tenant) return <div className="text-center py-20 text-gray-500">Tenant not found</div>

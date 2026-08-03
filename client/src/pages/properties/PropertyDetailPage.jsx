@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Edit2, Building2, MapPin, Pencil, Plus, UserPlus, Wrench } from 'lucide-react'
-import { useProperty, usePropertyUnits } from '../../hooks/useProperties'
+import { ArrowLeft, Edit2, Building2, MapPin, Pencil, Plus, UserPlus, Wrench, Trash2 } from 'lucide-react'
+import toast from 'react-hot-toast'
+import { useProperty, usePropertyUnits, useDeleteProperty } from '../../hooks/useProperties'
 import { formatCurrency } from '../../utils/formatters'
 import StatusBadge from '../../components/ui/StatusBadge'
 import DataTable from '../../components/ui/DataTable'
 import Modal from '../../components/ui/Modal'
+import ConfirmDialog from '../../components/ui/ConfirmDialog'
 import AddUnitForm from '../../components/forms/AddUnitForm'
 import AddTenantForm from '../../components/forms/AddTenantForm'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
@@ -32,14 +34,16 @@ export default function PropertyDetailPage() {
   const [showAddTenant, setShowAddTenant] = useState(false)
   const [selectedUnitId, setSelectedUnitId] = useState(null)
   const [showAddExpense, setShowAddExpense] = useState(false)
+  const [showDelete, setShowDelete] = useState(false)
 
+  const deleteProperty = useDeleteProperty()
   const { data: property, isLoading } = useProperty(id)
   const { data: unitsData, isLoading: unitsLoading } = usePropertyUnits(id)
   const { data: expensesData, isLoading: expensesLoading } = useExpenses({ propertyId: id })
   const { data: maintenanceData } = useMaintenance({ propertyId: id })
 
-  const units = unitsData?.units || []
-  const expenses = expensesData?.expenses || []
+  const units = unitsData || []
+  const expenses = expensesData || []
   const maintenanceRequests = maintenanceData?.data || []
 
   if (isLoading) return <LoadingSpinner fullPage />
@@ -110,6 +114,12 @@ export default function PropertyDetailPage() {
             {property.address}, {property.city}
           </div>
         </div>
+        <button
+          onClick={() => setShowDelete(true)}
+          className="flex items-center gap-1.5 text-sm text-red-500 hover:bg-red-50 px-3 py-1.5 rounded-lg"
+        >
+          <Trash2 className="h-4 w-4" /> Delete
+        </button>
       </div>
 
       {/* Tabs */}
@@ -226,6 +236,26 @@ export default function PropertyDetailPage() {
       <Modal isOpen={showAddExpense} onClose={() => setShowAddExpense(false)} title="Log Expense" size="md">
         <LogExpenseForm defaultPropertyId={id} onClose={() => setShowAddExpense(false)} />
       </Modal>
+
+      <ConfirmDialog
+        isOpen={showDelete}
+        onClose={() => setShowDelete(false)}
+        onConfirm={async () => {
+          try {
+            await deleteProperty.mutateAsync(id)
+            toast.success('Property deleted')
+            navigate('/properties')
+          } catch (err) {
+            toast.error(err.response?.data?.message || 'Failed to delete property')
+          }
+          setShowDelete(false)
+        }}
+        title="Delete Property"
+        message={`Are you sure you want to delete "${property.name}"? It will no longer appear anywhere in RentFlow. This cannot be undone from the app.`}
+        confirmLabel="Delete"
+        isLoading={deleteProperty.isPending}
+        isDangerous
+      />
     </div>
   )
 }

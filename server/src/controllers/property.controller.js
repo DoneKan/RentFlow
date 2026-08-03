@@ -153,7 +153,7 @@ async function update(req, res, next) {
     });
     if (!existing) throw ApiError.notFound('Property not found');
 
-    const { name, type, description, address, city, district, country, latitude, longitude, amenities } = req.body;
+    const { name, type, description, address, city, district, country, latitude, longitude, amenities, isActive } = req.body;
 
     const property = await prisma.property.update({
       where: { id: req.params.id },
@@ -168,6 +168,7 @@ async function update(req, res, next) {
         ...(latitude !== undefined && { latitude: parseFloat(latitude) }),
         ...(longitude !== undefined && { longitude: parseFloat(longitude) }),
         ...(amenities !== undefined && { amenities: JSON.stringify(amenities) }),
+        ...(isActive !== undefined && { isActive }),
       },
     });
 

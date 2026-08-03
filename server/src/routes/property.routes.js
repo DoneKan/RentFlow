@@ -30,6 +30,7 @@ const updateSchema = Joi.object({
   latitude: Joi.number().allow(null),
   longitude: Joi.number().allow(null),
   amenities: Joi.array().items(Joi.string()),
+  isActive: Joi.boolean(),
 });
 
 router.get('/vacant', controller.getVacant);

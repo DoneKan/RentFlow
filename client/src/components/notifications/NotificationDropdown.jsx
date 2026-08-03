@@ -20,7 +20,7 @@ export default function NotificationDropdown() {
   const { data } = useNotifications()
   const markAll = useMarkAllRead()
 
-  const notifications = data?.notifications || []
+  const notifications = data || []
   const unread = notifications.filter((n) => !n.isRead).length
 
   useEffect(() => {
