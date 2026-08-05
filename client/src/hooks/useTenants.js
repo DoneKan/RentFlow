@@ -27,6 +27,8 @@ export function useCreateTenant() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: TENANTS_KEY })
       qc.invalidateQueries({ queryKey: ['properties'] })
+      qc.invalidateQueries({ queryKey: ['property-units'] })
+      qc.invalidateQueries({ queryKey: ['property-units-vacant'] })
     },
   })
 }
@@ -49,6 +51,8 @@ export function useTerminateTenant() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: TENANTS_KEY })
       qc.invalidateQueries({ queryKey: ['properties'] })
+      qc.invalidateQueries({ queryKey: ['property-units'] })
+      qc.invalidateQueries({ queryKey: ['property-units-vacant'] })
     },
   })
 }
