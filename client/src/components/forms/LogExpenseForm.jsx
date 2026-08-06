@@ -3,6 +3,7 @@ import { Paperclip } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useQuery } from '@tanstack/react-query'
 import { useCreateExpense, useUpdateExpense } from '../../hooks/useExpenses'
+import { usePropertyUnits } from '../../hooks/useProperties'
 import { getProperties } from '../../services/property.service'
 import { EXPENSE_CATEGORIES } from '../../utils/constants'
 
@@ -13,6 +14,7 @@ export default function LogExpenseForm({ onClose, defaultPropertyId, expense, on
   const saving = isEditing ? update.isPending : create.isPending
   const [form, setForm] = useState({
     propertyId: expense?.propertyId || defaultPropertyId || '',
+    unitId: expense?.unitId || '',
     category: expense?.category || 'UTILITIES',
     amount: expense?.amount != null ? String(expense.amount) : '',
     description: expense?.description || '',
@@ -29,6 +31,9 @@ export default function LogExpenseForm({ onClose, defaultPropertyId, expense, on
     select: (r) => r.data || [],
     staleTime: 0,
   })
+
+  const { data: unitsData } = usePropertyUnits(form.propertyId)
+  const units = unitsData || []
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -64,10 +69,29 @@ export default function LogExpenseForm({ onClose, defaultPropertyId, expense, on
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
         <label className="label">Property *</label>
-        <select value={form.propertyId} onChange={(e) => set('propertyId', e.target.value)} className="input" required>
+        <select
+          value={form.propertyId}
+          onChange={(e) => setForm((p) => ({ ...p, propertyId: e.target.value, unitId: '' }))}
+          className="input"
+          required
+        >
           <option value="">Select property…</option>
           {(propertiesData || []).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
         </select>
+      </div>
+
+      <div>
+        <label className="label">Unit <span className="text-gray-400 text-xs">(optional)</span></label>
+        <select
+          value={form.unitId}
+          onChange={(e) => set('unitId', e.target.value)}
+          className="input"
+          disabled={!form.propertyId}
+        >
+          <option value="">Whole property</option>
+          {units.map((u) => <option key={u.id} value={u.id}>Unit #{u.unitNumber}</option>)}
+        </select>
+        <p className="mt-1 text-xs text-gray-400">Leave as "Whole property" for costs like land, taxes, or building-wide repairs. Pick a unit for costs specific to it, like painting one unit.</p>
       </div>
 
       <div>

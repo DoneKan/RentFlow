@@ -7,12 +7,13 @@ const prisma = new PrismaClient();
 
 async function list(req, res, next) {
   try {
-    const { page = 1, limit = 20, propertyId, category, startDate, endDate } = req.query;
+    const { page = 1, limit = 20, propertyId, unitId, category, startDate, endDate } = req.query;
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
     const where = {
       property: { organizationId: req.user.organizationId },
       ...(propertyId && { propertyId }),
+      ...(unitId && { unitId }),
       ...(category && { category }),
       ...(startDate || endDate) && {
         date: {
@@ -27,6 +28,7 @@ async function list(req, res, next) {
         where,
         include: {
           property: { select: { id: true, name: true, code: true } },
+          unit: { select: { id: true, unitNumber: true } },
         },
         orderBy: { date: 'desc' },
         skip,
@@ -89,16 +91,22 @@ async function summary(req, res, next) {
 
 async function create(req, res, next) {
   try {
-    const { propertyId, category, amount, description, date, vendor } = req.body;
+    const { propertyId, unitId, category, amount, description, date, vendor } = req.body;
 
     const property = await prisma.property.findFirst({
       where: { id: propertyId, organizationId: req.user.organizationId },
     });
     if (!property) throw ApiError.notFound('Property not found');
 
+    if (unitId) {
+      const unit = await prisma.unit.findFirst({ where: { id: unitId, propertyId } });
+      if (!unit) throw ApiError.notFound('Unit not found on this property');
+    }
+
     const expense = await prisma.expense.create({
       data: {
         propertyId,
+        unitId: unitId || null,
         category: category || 'OTHER',
         amount,
         description,
@@ -106,7 +114,7 @@ async function create(req, res, next) {
         vendor,
         receiptUrl: req.file ? `/uploads/${req.file.filename}` : undefined,
       },
-      include: { property: { select: { id: true, name: true } } },
+      include: { property: { select: { id: true, name: true } }, unit: { select: { id: true, unitNumber: true } } },
     });
 
     postExpenseEntry(prisma, { expense, organizationId: req.user.organizationId });
@@ -124,7 +132,7 @@ async function getOne(req, res, next) {
         id: req.params.id,
         property: { organizationId: req.user.organizationId },
       },
-      include: { property: { select: { id: true, name: true, code: true } } },
+      include: { property: { select: { id: true, name: true, code: true } }, unit: { select: { id: true, unitNumber: true } } },
     });
     if (!expense) throw ApiError.notFound('Expense not found');
 
@@ -144,7 +152,12 @@ async function update(req, res, next) {
     });
     if (!existing) throw ApiError.notFound('Expense not found');
 
-    const { category, amount, description, date, vendor } = req.body;
+    const { category, amount, description, date, vendor, unitId } = req.body;
+
+    if (unitId) {
+      const unit = await prisma.unit.findFirst({ where: { id: unitId, propertyId: existing.propertyId } });
+      if (!unit) throw ApiError.notFound('Unit not found on this property');
+    }
 
     const updated = await prisma.expense.update({
       where: { id: req.params.id },
@@ -154,8 +167,10 @@ async function update(req, res, next) {
         ...(description && { description }),
         ...(date && { date: new Date(date) }),
         ...(vendor !== undefined && { vendor }),
+        ...(unitId !== undefined && { unitId: unitId || null }),
         ...(req.file && { receiptUrl: `/uploads/${req.file.filename}` }),
       },
+      include: { property: { select: { id: true, name: true } }, unit: { select: { id: true, unitNumber: true } } },
     });
 
     return ApiResponse.success(res, updated, 'Expense updated');

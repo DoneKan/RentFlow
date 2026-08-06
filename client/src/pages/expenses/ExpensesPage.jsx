@@ -72,6 +72,7 @@ export default function ExpensesPage() {
   const columns = [
     { key: 'date', label: 'Date', render: (v) => formatDate(v) },
     { key: 'property', label: 'Property', render: (_, row) => row.property?.name || '—' },
+    { key: 'unit', label: 'Unit', render: (_, row) => row.unit ? `Unit #${row.unit.unitNumber}` : <span className="text-gray-400">Whole property</span> },
     {
       key: 'category', label: 'Category',
       render: (v) => (

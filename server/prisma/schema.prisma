@@ -122,6 +122,7 @@ model Unit {
   tenancy             Tenancy?
   invoices            Invoice[]
   maintenanceRequests MaintenanceRequest[]
+  expenses            Expense[]
 
   @@unique([propertyId, unitNumber])
   @@index([propertyId])
@@ -217,6 +218,7 @@ model Payment {
 model Expense {
   id          String   @id @default(cuid())
   propertyId  String
+  unitId      String?
   category    String   @default("OTHER")
   amount      Decimal
   currency    String   @default("UGX")
@@ -228,8 +230,10 @@ model Expense {
   updatedAt   DateTime @updatedAt
 
   property Property @relation(fields: [propertyId], references: [id])
+  unit     Unit?    @relation(fields: [unitId], references: [id])
 
   @@index([propertyId])
+  @@index([unitId])
   @@index([category])
   @@index([date])
   @@map("expenses")

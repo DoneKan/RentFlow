@@ -90,6 +90,7 @@ export default function PropertyDetailPage() {
 
   const expenseCols = [
     { key: 'date', label: 'Date', render: (v) => formatDate(v) },
+    { key: 'unit', label: 'Unit', render: (_, row) => row.unit ? `Unit #${row.unit.unitNumber}` : <span className="text-gray-400">Whole property</span> },
     { key: 'category', label: 'Category', render: (v) => v.replace(/_/g, ' ') },
     { key: 'description', label: 'Description' },
     { key: 'amount', label: 'Amount', render: (v) => formatCurrency(v) },
