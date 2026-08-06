@@ -11,8 +11,8 @@ import AddPropertyForm from '../../components/forms/AddPropertyForm'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 
 function PropertyCard({ property, onClick }) {
-  const occupiedUnits = property._count?.units?.occupied || property.occupiedUnits || 0
-  const totalUnits = property._count?.units || property.totalUnits || 0
+  const occupiedUnits = property.occupiedUnits || 0
+  const totalUnits = property.totalUnits || 0
   const occupancyRate = totalUnits > 0 ? Math.round((occupiedUnits / totalUnits) * 100) : 0
 
   return (

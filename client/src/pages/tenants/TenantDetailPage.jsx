@@ -28,8 +28,9 @@ export default function TenantDetailPage() {
   const terminate = useTerminateTenant()
   const sendReminder = useSendReminder()
 
-  const { data: invoicesData, isLoading: invLoading } = useInvoices({ tenantId: id })
-  const { data: paymentsData, isLoading: payLoading } = usePayments({ tenantId: id })
+  const tenantUserId = tenancy?.tenant?.id
+  const { data: invoicesData, isLoading: invLoading } = useInvoices({ tenantId: tenantUserId })
+  const { data: paymentsData, isLoading: payLoading } = usePayments({ tenantId: tenantUserId })
 
   const invoices = invoicesData || []
   const payments = paymentsData || []

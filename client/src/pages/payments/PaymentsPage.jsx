@@ -1,11 +1,12 @@
 ﻿import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { Plus, Download, CreditCard, Smartphone, Banknote, Wallet } from 'lucide-react'
 import toast from 'react-hot-toast'
 import PageHeader from '../../components/ui/PageHeader'
 import DataTable from '../../components/ui/DataTable'
 import StatCard from '../../components/ui/StatCard'
 import StatusBadge from '../../components/ui/StatusBadge'
+import Modal from '../../components/ui/Modal'
 import RecordPaymentForm from '../../components/forms/RecordPaymentForm'
 import { getPayments, downloadReceipt } from '../../services/payment.service'
 import { formatCurrency, formatDateTime, getPaymentMethodLabel } from '../../utils/formatters'
@@ -18,7 +19,6 @@ const METHOD_ICONS = {
 }
 
 export default function PaymentsPage() {
-  const queryClient = useQueryClient()
   const [showForm, setShowForm] = useState(false)
   const [methodFilter, setMethodFilter] = useState('ALL')
   const [downloading, setDownloading] = useState(null)
@@ -140,15 +140,9 @@ export default function PaymentsPage() {
         />
       </div>
 
-      <RecordPaymentForm
-        isOpen={showForm}
-        onClose={() => setShowForm(false)}
-        onSuccess={() => {
-          queryClient.invalidateQueries({ queryKey: ['payments'] })
-          queryClient.invalidateQueries({ queryKey: ['invoices'] })
-          setShowForm(false)
-        }}
-      />
+      <Modal isOpen={showForm} onClose={() => setShowForm(false)} title="Record Payment">
+        <RecordPaymentForm onClose={() => setShowForm(false)} />
+      </Modal>
     </div>
   )
 }

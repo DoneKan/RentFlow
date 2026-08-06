@@ -127,6 +127,12 @@ export default function InvoiceDetailPage() {
                   <p className="font-medium">{formatDateTime(invoice.sentAt)}</p>
                 </div>
               )}
+              {invoice.notes && (
+                <div className="col-span-2">
+                  <p className="text-gray-500">Notes</p>
+                  <p className="font-medium">{invoice.notes}</p>
+                </div>
+              )}
               {invoice.paidAt && (
                 <div>
                   <p className="text-gray-500">Paid At</p>

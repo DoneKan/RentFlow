@@ -97,7 +97,7 @@ async function list(req, res, next) {
 
 async function create(req, res, next) {
   try {
-    const { tenancyId, dueDate, latePenalty, customItems } = req.body;
+    const { tenancyId, dueDate, latePenalty, customItems, notes } = req.body;
 
     const tenancy = await prisma.tenancy.findFirst({
       where: {
@@ -130,6 +130,7 @@ async function create(req, res, next) {
         dueDate: new Date(dueDate),
         items: JSON.stringify(items),
         latePenalty: latePenalty || 0,
+        notes: notes || undefined,
         status: 'DRAFT',
       },
       include: {

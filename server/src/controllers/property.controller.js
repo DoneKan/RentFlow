@@ -15,6 +15,31 @@ function parseAmenities(p) {
   }
 }
 
+// Sums this calendar month's completed payments per property. Payment has no
+// direct propertyId column (it hangs off invoice), so this can't be a
+// Prisma groupBy — fetch the raw rows and reduce in JS instead.
+async function getMonthlyRevenueByProperty(propertyIds) {
+  if (propertyIds.length === 0) return {};
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+
+  const payments = await prisma.payment.findMany({
+    where: {
+      invoice: { propertyId: { in: propertyIds } },
+      status: 'COMPLETED',
+      paidAt: { gte: monthStart, lte: monthEnd },
+    },
+    select: { amount: true, invoice: { select: { propertyId: true } } },
+  });
+
+  return payments.reduce((acc, pay) => {
+    const pid = pay.invoice.propertyId;
+    acc[pid] = (acc[pid] || 0) + Number(pay.amount);
+    return acc;
+  }, {});
+}
+
 async function list(req, res, next) {
   try {
     const { page = 1, limit = 20 } = req.query;
@@ -37,12 +62,20 @@ async function list(req, res, next) {
       prisma.property.count({ where }),
     ]);
 
+    const revenueByProperty = await getMonthlyRevenueByProperty(properties.map((p) => p.id));
+
     const enriched = properties.map((p) => {
       const totalUnits = p._count.units;
       const occupied = p.units.filter((u) => u.status === 'OCCUPIED').length;
       const occupancyRate = totalUnits > 0 ? Math.round((occupied / totalUnits) * 100) : 0;
       const { units, ...rest } = p;
-      return parseAmenities({ ...rest, totalUnits, occupiedUnits: occupied, occupancyRate });
+      return parseAmenities({
+        ...rest,
+        totalUnits,
+        occupiedUnits: occupied,
+        occupancyRate,
+        monthlyRevenue: revenueByProperty[p.id] || 0,
+      });
     });
 
     return ApiResponse.paginated(res, enriched, {
@@ -140,7 +173,9 @@ async function getOne(req, res, next) {
 
     if (!property) throw ApiError.notFound('Property not found');
 
-    return ApiResponse.success(res, parseAmenities(property));
+    const revenueByProperty = await getMonthlyRevenueByProperty([property.id]);
+
+    return ApiResponse.success(res, parseAmenities({ ...property, monthlyRevenue: revenueByProperty[property.id] || 0 }));
   } catch (err) {
     next(err);
   }

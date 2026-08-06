@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { format } from 'date-fns'
+import { format, differenceInCalendarDays } from 'date-fns'
 import {
   Building2, Users, TrendingUp, AlertCircle,
   Plus, UserPlus, CreditCard, Receipt, Send,
@@ -208,7 +208,7 @@ export default function DashboardPage() {
                 <div key={p.id} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
                   <div>
                     <p className="text-sm font-medium text-gray-900">{p.tenant?.name}</p>
-                    <p className="text-xs text-gray-500">{p.unit?.unitNumber} · {getPaymentMethodLabel(p.method)}</p>
+                    <p className="text-xs text-gray-500">{p.invoice?.unit?.unitNumber} · {getPaymentMethodLabel(p.method)}</p>
                   </div>
                   <div className="text-right">
                     <p className="text-sm font-semibold text-gray-900">{formatCurrency(p.amount)}</p>
@@ -237,7 +237,7 @@ export default function DashboardPage() {
                   <div>
                     <p className="text-sm font-medium text-gray-900">{inv.tenant?.name}</p>
                     <p className="text-xs text-gray-500">
-                      {inv.unit?.unitNumber} · <span className="text-red-500">{inv.daysOverdue}d overdue</span>
+                      {inv.unit?.unitNumber} · <span className="text-red-500">{differenceInCalendarDays(new Date(), new Date(inv.dueDate))}d overdue</span>
                     </p>
                   </div>
                   <div className="flex items-center gap-2">

@@ -17,6 +17,7 @@ const createSchema = Joi.object({
       type: Joi.string().default('charge'),
     })
   ).allow(null),
+  notes: Joi.string().allow('', null),
 });
 
 router.get('/', authenticate, controller.list);

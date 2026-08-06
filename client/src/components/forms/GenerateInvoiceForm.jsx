@@ -73,6 +73,7 @@ export default function GenerateInvoiceForm({ onClose, defaultTenantId }) {
         dueDate,
         latePenalty: latePenalty ? parseFloat(latePenalty) : 0,
         customItems: items.map((i) => ({ ...i, amount: parseFloat(i.amount) || 0 })),
+        notes,
       })
       toast.success('Invoice generated!')
       onClose()

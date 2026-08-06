@@ -169,6 +169,7 @@ model Invoice {
   dueDate       DateTime
   items         String
   latePenalty   Decimal   @default(0)
+  notes         String?
   status        String    @default("DRAFT")
   sentAt        DateTime?
   paidAt        DateTime?
