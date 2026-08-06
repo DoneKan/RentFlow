@@ -22,30 +22,30 @@ export default function TenantsPage() {
     if (!search) return true
     const q = search.toLowerCase()
     return (
-      t.name?.toLowerCase().includes(q) ||
-      t.email?.toLowerCase().includes(q) ||
-      t.phone?.toLowerCase().includes(q) ||
+      t.tenant?.name?.toLowerCase().includes(q) ||
+      t.tenant?.email?.toLowerCase().includes(q) ||
+      t.tenant?.phone?.toLowerCase().includes(q) ||
       t.unit?.unitNumber?.toLowerCase().includes(q)
     )
   })
 
   const columns = [
     {
-      key: 'name',
+      key: 'tenant',
       label: 'Tenant',
-      render: (v, row) => (
+      render: (v) => (
         <div className="flex items-center gap-3">
           <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-brand/10 text-brand text-xs font-semibold">
-            {v?.split(' ').slice(0, 2).map((n) => n[0]).join('').toUpperCase()}
+            {v?.name?.split(' ').slice(0, 2).map((n) => n[0]).join('').toUpperCase()}
           </div>
           <div>
-            <p className="font-medium text-gray-900">{v}</p>
-            <p className="text-xs text-gray-400">{row.email}</p>
+            <p className="font-medium text-gray-900">{v?.name}</p>
+            <p className="text-xs text-gray-400">{v?.email}</p>
           </div>
         </div>
       ),
     },
-    { key: 'phone', label: 'Phone' },
+    { key: 'phone', label: 'Phone', render: (_, row) => row.tenant?.phone || '—' },
     {
       key: 'unit',
       label: 'Unit',
@@ -109,7 +109,7 @@ export default function TenantsPage() {
           data={filtered}
           loading={isLoading}
           emptyMessage="No tenants match your search"
-          onRowClick={(row) => navigate(`/tenants/${row.userId || row.id}`)}
+          onRowClick={(row) => navigate(`/tenants/${row.id}`)}
         />
       )}
 

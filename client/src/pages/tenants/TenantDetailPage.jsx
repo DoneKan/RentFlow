@@ -24,7 +24,7 @@ export default function TenantDetailPage() {
   const [showPayment, setShowPayment] = useState(false)
   const [showTerminate, setShowTerminate] = useState(false)
 
-  const { data: tenant, isLoading } = useTenant(id)
+  const { data: tenancy, isLoading } = useTenant(id)
   const terminate = useTerminateTenant()
   const sendReminder = useSendReminder()
 
@@ -35,9 +35,9 @@ export default function TenantDetailPage() {
   const payments = paymentsData || []
 
   if (isLoading) return <LoadingSpinner fullPage />
-  if (!tenant) return <div className="text-center py-20 text-gray-500">Tenant not found</div>
+  if (!tenancy) return <div className="text-center py-20 text-gray-500">Tenant not found</div>
 
-  const tenancy = tenant.tenancy
+  const tenant = tenancy.tenant
 
   const handleTerminate = async () => {
     try {
@@ -132,7 +132,7 @@ export default function TenantDetailPage() {
               </div>
               <div>
                 <p className="text-gray-500">Payment Period</p>
-                <p className="font-medium mt-0.5">{tenancy.paymentPeriod}</p>
+                <p className="font-medium mt-0.5">{tenancy.unit?.paymentPeriod}</p>
               </div>
               <div>
                 <p className="text-gray-500">Deposit</p>

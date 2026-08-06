@@ -14,7 +14,7 @@ function GenerateModal({ onClose }) {
   const { data: tenantsData } = useTenants({ status: 'ACTIVE', limit: 100 })
   const create = useCreateLeaseDocument()
   const [tenancyId, setTenancyId] = useState('')
-  const tenancies = tenantsData?.data || []
+  const tenancies = tenantsData || []
 
   const handleSubmit = async (e) => {
     e.preventDefault()
