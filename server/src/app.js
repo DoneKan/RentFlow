@@ -5,12 +5,12 @@ const helmet = require('helmet');
 const compression = require('compression');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
-const { PrismaClient } = require('@prisma/client');
 const path = require('path');
 
 const logger = require('./utils/logger');
 const errorHandler = require('./middleware/errorHandler');
 const ApiError = require('./utils/ApiError');
+const prisma = require('./utils/prisma');
 
 // Routes
 const authRoutes = require('./routes/auth.routes');
@@ -32,7 +32,6 @@ const budgetRoutes = require('./routes/budget.routes');
 const accountRoutes = require('./routes/account.routes');
 const ledgerRoutes = require('./routes/ledger.routes');
 
-const prisma = new PrismaClient();
 const app = express();
 
 // Trust Railway's proxy so express-rate-limit can read X-Forwarded-For correctly

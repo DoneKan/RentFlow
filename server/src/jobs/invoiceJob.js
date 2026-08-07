@@ -1,10 +1,9 @@
 const cron = require('node-cron');
-const { PrismaClient } = require('@prisma/client');
 const { generateInvoiceNumber } = require('../utils/generateCode');
 const { sendDemandNotice } = require('../utils/emailService');
 const logger = require('../utils/logger');
 
-const prisma = new PrismaClient();
+const prisma = require('../utils/prisma');
 
 function getNextDueDate(startDate, paymentPeriod, referenceDate = new Date()) {
   const start = new Date(startDate);

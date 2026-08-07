@@ -1,10 +1,9 @@
-const { PrismaClient } = require('@prisma/client');
 const ApiError = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
 const { syncOverdueStatuses } = require('../jobs/invoiceJob');
 const { attachCurrentTenancy } = require('../utils/tenancyHelpers');
 
-const prisma = new PrismaClient();
+const prisma = require('../utils/prisma');
 
 function startOfMonth(year, month) {
   return new Date(year, month - 1, 1);

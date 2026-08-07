@@ -1,10 +1,9 @@
-const { PrismaClient } = require('@prisma/client');
 const ApiError = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
 const { generatePropertyCode } = require('../utils/generateCode');
 const { attachCurrentTenancy } = require('../utils/tenancyHelpers');
 
-const prisma = new PrismaClient();
+const prisma = require('../utils/prisma');
 
 // SQLite stores amenities as a JSON string — parse on read, stringify on write
 function parseAmenities(p) {

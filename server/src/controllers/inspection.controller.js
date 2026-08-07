@@ -1,9 +1,8 @@
-const { PrismaClient } = require('@prisma/client');
 const ApiError = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
 const { generateInspectionReport } = require('../utils/pdfGenerator');
 
-const prisma = new PrismaClient();
+const prisma = require('../utils/prisma');
 
 const detailInclude = {
   property: { select: { id: true, name: true, code: true } },

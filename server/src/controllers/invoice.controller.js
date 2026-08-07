@@ -1,4 +1,3 @@
-const { PrismaClient } = require('@prisma/client');
 const ApiError = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
 const { generateInvoiceNumber } = require('../utils/generateCode');
@@ -7,7 +6,7 @@ const { sendInvoiceEmail, sendRentReminder, sendDemandNotice } = require('../uti
 const { syncOverdueStatuses } = require('../jobs/invoiceJob');
 const logger = require('../utils/logger');
 
-const prisma = new PrismaClient();
+const prisma = require('../utils/prisma');
 
 function parseAdditionalCharges(unit) {
   if (!unit) return unit;

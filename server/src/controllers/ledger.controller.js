@@ -1,8 +1,7 @@
-const { PrismaClient } = require('@prisma/client');
 const ApiError = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
 
-const prisma = new PrismaClient();
+const prisma = require('../utils/prisma');
 
 function dateRangeFilter(query) {
   const { startDate, endDate } = query;

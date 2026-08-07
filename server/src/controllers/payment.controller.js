@@ -1,4 +1,3 @@
-const { PrismaClient } = require('@prisma/client');
 const ApiError = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
 const { generateReceiptNumber } = require('../utils/generateCode');
@@ -9,7 +8,7 @@ const mtnService = require('../services/mtnService');
 const airtelService = require('../services/airtelService');
 const logger = require('../utils/logger');
 
-const prisma = new PrismaClient();
+const prisma = require('../utils/prisma');
 
 async function uniqueReceiptNumber() {
   let rn = generateReceiptNumber();

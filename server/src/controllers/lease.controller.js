@@ -1,9 +1,8 @@
-const { PrismaClient } = require('@prisma/client');
 const ApiError = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
 const { generateLeaseAgreement } = require('../utils/pdfGenerator');
 
-const prisma = new PrismaClient();
+const prisma = require('../utils/prisma');
 
 async function loadFullTenancy(tenancyId) {
   return prisma.tenancy.findUnique({

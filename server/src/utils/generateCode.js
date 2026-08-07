@@ -1,6 +1,4 @@
-const { PrismaClient } = require('@prisma/client');
-
-const prisma = new PrismaClient();
+const prisma = require('./prisma');
 
 function pad(str, length) {
   return str.length >= length ? str : str + '0'.repeat(length - str.length);

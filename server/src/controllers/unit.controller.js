@@ -1,9 +1,8 @@
-const { PrismaClient } = require('@prisma/client');
 const ApiError = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
 const { attachCurrentTenancy } = require('../utils/tenancyHelpers');
 
-const prisma = new PrismaClient();
+const prisma = require('../utils/prisma');
 
 function parseUnit(unit) {
   if (!unit) return unit;
