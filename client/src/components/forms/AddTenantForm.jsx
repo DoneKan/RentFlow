@@ -85,13 +85,13 @@ export default function AddTenantForm({ onClose, defaultPropertyId, defaultName,
       const res = await create.mutateAsync({
         name: form.name, email: form.email, phone: form.phone,
         propertyId: form.propertyId, unitId: form.unitId,
-        startDate: form.startDate, paymentPeriod: form.paymentPeriod,
+        startDate: form.startDate,
         rentAmount: parseFloat(form.rentAmount),
         depositAmount: form.depositAmount ? parseFloat(form.depositAmount) : 0,
         notes,
       })
       toast.success('Tenant added successfully!')
-      onSuccess?.(res.data?.data)
+      onSuccess?.(res.data)
       onClose()
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to add tenant')
@@ -180,9 +180,12 @@ export default function AddTenantForm({ onClose, defaultPropertyId, defaultName,
               </div>
               <div>
                 <label className="label">Payment period</label>
-                <select value={form.paymentPeriod} onChange={(e) => set('paymentPeriod', e.target.value)} className="input">
-                  {PAYMENT_PERIODS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
-                </select>
+                <input
+                  value={PAYMENT_PERIODS.find((p) => p.value === form.paymentPeriod)?.label || form.paymentPeriod}
+                  className="input bg-gray-50 text-gray-500"
+                  disabled
+                  title="Set on the unit — edit the unit to change its payment period"
+                />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">

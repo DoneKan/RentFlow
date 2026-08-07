@@ -131,6 +131,7 @@ async function getVacant(req, res, next) {
         status: 'VACANT',
         property: {
           isActive: true,
+          organizationId: req.user.organizationId,
           ...(city && { city }),
           ...(district && { district }),
         },

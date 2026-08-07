@@ -1,7 +1,7 @@
 const { Router } = require('express');
 const Joi = require('joi');
 const controller = require('../controllers/property.controller');
-const { authenticate, authorize, optionalAuth } = require('../middleware/auth');
+const { authenticate, authorize } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
 
 const router = Router();
@@ -33,7 +33,7 @@ const updateSchema = Joi.object({
   isActive: Joi.boolean(),
 });
 
-router.get('/vacant', controller.getVacant);
+router.get('/vacant', authenticate, controller.getVacant);
 router.get('/', authenticate, controller.list);
 router.post('/', authenticate, authorize('SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'LANDLORD'), validate(createSchema), controller.create);
 router.get('/:id', authenticate, controller.getOne);
