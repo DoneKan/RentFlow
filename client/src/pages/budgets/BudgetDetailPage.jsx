@@ -21,6 +21,17 @@ export default function BudgetDetailPage() {
     Planned: l.plannedAmount,
     Actual: l.actual,
   }))
+  // Extra grouped bar: straight sum of the category bars already shown
+  // above, not a separate query. (Not data.totals — that deliberately
+  // excludes the Rental Income line, which this chart still plots as one
+  // of its bars, so it wouldn't match what's actually on screen.)
+  if (chartData.length > 0) {
+    chartData.push({
+      category: 'Total',
+      Planned: chartData.reduce((s, r) => s + (r.Planned || 0), 0),
+      Actual: chartData.reduce((s, r) => s + (r.Actual || 0), 0),
+    })
+  }
 
   return (
     <div className="space-y-6">

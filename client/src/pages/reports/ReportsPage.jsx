@@ -100,6 +100,21 @@ export default function ReportsPage() {
     refetchOnMount: 'always',
   })
 
+  // 7th grouped bar: straight sum of the 6 months already fetched above,
+  // not a separate query.
+  const trendWithTotal = useMemo(() => {
+    const trend = overview?.trend || []
+    if (trend.length === 0) return trend
+    return [
+      ...trend,
+      {
+        month: 'Total',
+        revenue: trend.reduce((s, m) => s + (m.revenue || 0), 0),
+        expenses: trend.reduce((s, m) => s + (m.expenses || 0), 0),
+      },
+    ]
+  }, [overview])
+
   const pieData = (overview?.expenses?.byCategory || [])
     .filter((c) => c.amount > 0)
     .map((c) => ({ name: CATEGORY_LABELS[c.category] || c.category, value: c.amount, color: PIE_COLORS[c.category] || '#6b7280' }))
@@ -255,7 +270,7 @@ export default function ReportsPage() {
               <div className="card">
                 <h3 className="text-sm font-semibold text-gray-700 mb-4">Revenue vs Expenses (6 months)</h3>
                 <ResponsiveContainer width="100%" height={240}>
-                  <BarChart data={overview?.trend || []}>
+                  <BarChart data={trendWithTotal}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                     <XAxis dataKey="month" tick={{ fontSize: 12 }} />
                     <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}K`} />
