@@ -57,7 +57,19 @@ export default function DashboardPage() {
   const invoicesSummary = data?.invoices || {}
   const recentPayments = data?.recentPayments || []
   const overdueInvoices = data?.overdueInvoices || []
-  const revenueChart = data?.trend || []
+  const monthlyChart = data?.trend || []
+  // 7th grouped bar: straight sum of the 6 months already fetched above,
+  // not a separate query.
+  const revenueChart = monthlyChart.length > 0
+    ? [
+        ...monthlyChart,
+        {
+          month: 'Total',
+          revenue: monthlyChart.reduce((s, m) => s + (m.revenue || 0), 0),
+          expenses: monthlyChart.reduce((s, m) => s + (m.expenses || 0), 0),
+        },
+      ]
+    : monthlyChart
   const occupancyData = units.total > 0
     ? [
         { name: 'Occupied', value: units.occupied || 0 },
