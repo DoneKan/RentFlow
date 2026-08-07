@@ -176,6 +176,17 @@ model Invoice {
   paidAt        DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
+  // Set only by the recurring-invoice job, to "YYYY-MM" of the billing
+  // month — the (tenancyId, billingPeriod) unique constraint below is what
+  // makes that job idempotent even under concurrent/duplicate runs. Left
+  // null on manually-created invoices, which never collide with each other
+  // since SQL treats every NULL as distinct under a unique constraint.
+  billingPeriod String?
+  // Snapshot, taken when this draft was auto-generated, of the tenant's
+  // other outstanding (SENT/OVERDUE) balance at that moment — so a
+  // generated draft surfaces "they're behind" instead of silently
+  // producing another invoice next to an unpaid one.
+  priorUnpaidAmount Decimal @default(0)
 
   tenancy  Tenancy   @relation(fields: [tenancyId], references: [id])
   unit     Unit      @relation(fields: [unitId], references: [id])
@@ -183,6 +194,7 @@ model Invoice {
   tenant   User      @relation("TenantInvoices", fields: [tenantId], references: [id])
   payments Payment[]
 
+  @@unique([tenancyId, billingPeriod])
   @@index([tenancyId])
   @@index([tenantId])
   @@index([propertyId])

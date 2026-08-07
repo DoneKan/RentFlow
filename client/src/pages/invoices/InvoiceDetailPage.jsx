@@ -1,5 +1,6 @@
 ﻿import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Download, Send, X, CreditCard } from 'lucide-react'
+import { ArrowLeft, Download, Send, X, CreditCard, AlertTriangle, Clock } from 'lucide-react'
+import { differenceInCalendarDays } from 'date-fns'
 import toast from 'react-hot-toast'
 import { useInvoice, useSendInvoice, useSendReminder, useCancelInvoice } from '../../hooks/useInvoices'
 import { formatCurrency, formatDate, formatDateTime } from '../../utils/formatters'
@@ -8,6 +9,8 @@ import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import { useState } from 'react'
 import Modal from '../../components/ui/Modal'
 import RecordPaymentForm from '../../components/forms/RecordPaymentForm'
+
+const STALE_DRAFT_DAYS = 3
 
 export default function InvoiceDetailPage() {
   const { id } = useParams()
@@ -22,6 +25,9 @@ export default function InvoiceDetailPage() {
   if (!invoice) return <div className="text-center py-20 text-gray-500">Invoice not found</div>
 
   const items = Array.isArray(invoice.items) ? invoice.items : []
+  const priorUnpaid = Number(invoice.priorUnpaidAmount) || 0
+  const draftAgeDays = invoice.status === 'DRAFT' ? differenceInCalendarDays(new Date(), new Date(invoice.createdAt)) : 0
+  const isStaleDraft = draftAgeDays >= STALE_DRAFT_DAYS
 
   const handleSend = async () => {
     try { await sendInvoice.mutateAsync(id); toast.success('Invoice sent!') }
@@ -45,7 +51,21 @@ export default function InvoiceDetailPage() {
         </button>
         <h1 className="text-2xl font-bold text-gray-900">Invoice</h1>
         <StatusBadge status={invoice.status} />
+        {isStaleDraft && (
+          <span className="inline-flex items-center gap-1 text-xs font-medium text-orange-600 bg-orange-50 border border-orange-200 rounded-full px-2.5 py-1">
+            <Clock className="h-3.5 w-3.5" /> Drafted {draftAgeDays} days ago — still needs review
+          </span>
+        )}
       </div>
+
+      {priorUnpaid > 0 && (
+        <div className="mb-4 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+          <span>
+            This tenant had <strong>{formatCurrency(priorUnpaid)}</strong> outstanding from a previous invoice when this draft was generated.
+          </span>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Invoice document */}

@@ -1,6 +1,7 @@
 ﻿import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, FileText } from 'lucide-react'
+import { Plus, FileText, Clock, AlertTriangle } from 'lucide-react'
+import { differenceInCalendarDays } from 'date-fns'
 import toast from 'react-hot-toast'
 import { useInvoices, useSendInvoice, useSendReminder, useCancelInvoice } from '../../hooks/useInvoices'
 import { formatCurrency, formatDate } from '../../utils/formatters'
@@ -12,6 +13,10 @@ import GenerateInvoiceForm from '../../components/forms/GenerateInvoiceForm'
 import EmptyState from '../../components/ui/EmptyState'
 
 const STATUS_TABS = ['All', 'Draft', 'Sent', 'Paid', 'Overdue']
+// A draft sitting this long without being sent/edited/cancelled is easy to
+// lose track of in a list sorted by creation date — flag it instead of
+// leaving it to blend in.
+const STALE_DRAFT_DAYS = 3
 
 export default function InvoicesPage() {
   const navigate = useNavigate()
@@ -50,7 +55,35 @@ export default function InvoicesPage() {
     { key: 'unit', label: 'Property / Unit', render: (u, row) => <span className="text-gray-600">{row.property?.name} · #{u?.unitNumber}</span> },
     { key: 'amount', label: 'Amount', render: (v) => <span className="font-semibold">{formatCurrency(v)}</span> },
     { key: 'dueDate', label: 'Due Date', render: (v) => formatDate(v) },
-    { key: 'status', label: 'Status', render: (v) => <StatusBadge status={v} /> },
+    {
+      key: 'status', label: 'Status',
+      render: (v, row) => {
+        const draftAgeDays = v === 'DRAFT' ? differenceInCalendarDays(new Date(), new Date(row.createdAt)) : 0
+        const isStaleDraft = draftAgeDays >= STALE_DRAFT_DAYS
+        const priorUnpaid = Number(row.priorUnpaidAmount) || 0
+        return (
+          <div className="flex items-center gap-2 flex-wrap">
+            <StatusBadge status={v} />
+            {isStaleDraft && (
+              <span
+                title={`Drafted ${draftAgeDays} days ago — still needs review`}
+                className="inline-flex items-center gap-1 text-xs font-medium text-orange-600"
+              >
+                <Clock className="h-3.5 w-3.5" /> Stale
+              </span>
+            )}
+            {priorUnpaid > 0 && (
+              <span
+                title={`Tenant has ${formatCurrency(priorUnpaid)} outstanding from a previous invoice`}
+                className="inline-flex items-center gap-1 text-xs font-medium text-red-600"
+              >
+                <AlertTriangle className="h-3.5 w-3.5" /> Behind
+              </span>
+            )}
+          </div>
+        )
+      },
+    },
     {
       key: 'id', label: 'Actions',
       render: (id, row) => (

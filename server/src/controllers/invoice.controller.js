@@ -34,13 +34,17 @@ function parseInvoiceItems(invoice) {
   }
 }
 
-function buildInvoiceItems(unit) {
+// `rentAmount` defaults to the unit's listed rate but should normally be
+// the tenancy's own rentAmount — a tenant's actual rate can diverge from
+// the unit's default (a negotiated rate, or a rent change applied via the
+// tenancy update endpoint after the lease started).
+function buildInvoiceItems(unit, rentAmount = unit.rentAmount) {
   const charges = typeof unit.additionalCharges === 'string'
     ? JSON.parse(unit.additionalCharges || '{}')
     : (unit.additionalCharges || {});
 
   const items = [
-    { description: `Rent — ${unit.type} Unit ${unit.unitNumber}`, amount: Number(unit.rentAmount), type: 'rent' },
+    { description: `Rent — ${unit.type} Unit ${unit.unitNumber}`, amount: Number(rentAmount), type: 'rent' },
   ];
 
   if (charges.utilities) items.push({ description: 'Utilities', amount: Number(charges.utilities), type: 'charge' });
@@ -111,7 +115,7 @@ async function create(req, res, next) {
     });
     if (!tenancy) throw ApiError.notFound('Active tenancy not found');
 
-    const items = customItems || buildInvoiceItems(tenancy.unit);
+    const items = customItems || buildInvoiceItems(tenancy.unit, tenancy.rentAmount);
     const total = items.reduce((sum, i) => sum + Number(i.amount), 0) + (Number(latePenalty) || 0);
 
     let invoiceNumber = generateInvoiceNumber();

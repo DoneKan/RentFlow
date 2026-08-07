@@ -5,31 +5,47 @@ const logger = require('../utils/logger');
 
 const prisma = require('../utils/prisma');
 
+// Adds `months` to `anchorDate`, clamped to the last day of the target
+// month when the anchor's day-of-month doesn't exist there (e.g. the 31st
+// in a 30-day month, or the 29th-31st in February). Always computed from
+// the ORIGINAL anchor day, never from a previously-clamped result — so a
+// lease that started on the 31st bills on the 31st in every month long
+// enough for it (Mar, May, Jul, ...), and only falls back in the months
+// that don't fit, rather than permanently drifting down to 28 forever
+// after the first time it passes through February.
+function addMonthsFromAnchor(anchorDate, months) {
+  const day = anchorDate.getDate();
+  const target = new Date(anchorDate.getFullYear(), anchorDate.getMonth() + months, 1);
+  const daysInTargetMonth = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
+  target.setDate(Math.min(day, daysInTargetMonth));
+  return target;
+}
+
+function periodMonths(paymentPeriod) {
+  switch (paymentPeriod) {
+    case 'QUARTERLY': return 3;
+    case 'SEMI_ANNUAL': return 6;
+    case 'ANNUAL': return 12;
+    default: return 1;
+  }
+}
+
+// Returns the most recent due date on or before `referenceDate` for a
+// tenancy that started on `startDate` and bills every `paymentPeriod`.
 function getNextDueDate(startDate, paymentPeriod, referenceDate = new Date()) {
   const start = new Date(startDate);
   const today = new Date(referenceDate);
+  const months = periodMonths(paymentPeriod);
 
-  const addMonths = (date, months) => {
-    const d = new Date(date);
-    d.setMonth(d.getMonth() + months);
-    return d;
-  };
-
-  let months;
-  switch (paymentPeriod) {
-    case 'QUARTERLY': months = 3; break;
-    case 'SEMI_ANNUAL': months = 6; break;
-    case 'ANNUAL': months = 12; break;
-    default: months = 1;
+  let periodsElapsed = 0;
+  while (addMonthsFromAnchor(start, (periodsElapsed + 1) * months) <= today) {
+    periodsElapsed++;
   }
+  return addMonthsFromAnchor(start, periodsElapsed * months);
+}
 
-  let candidate = new Date(start);
-  while (candidate <= today) {
-    candidate = addMonths(candidate, months);
-  }
-
-  // Return the previous candidate (the current due date)
-  return addMonths(candidate, -months);
+function monthKey(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
 }
 
 function isSameDayOfMonth(date1, date2) {
@@ -54,45 +70,67 @@ async function processAutoInvoicing() {
   const today = new Date();
 
   try {
+    // Tenancies with an ended lease (a turned-over unit) never bill again —
+    // status flips to TERMINATED via the terminate endpoint, which this
+    // excludes. A fixed-term lease whose endDate has passed but hasn't been
+    // operationally terminated yet is handled per-tenancy below, since
+    // whether it's "ended before the billing date" depends on the billing
+    // date, which is only known once computed for that specific tenancy.
     const activeTenancies = await prisma.tenancy.findMany({
       where: { status: 'ACTIVE' },
-      include: {
-        unit: true,
-        tenant: true,
-        property: true,
-        invoices: {
-          where: {
-            status: { not: 'CANCELLED' },
-            dueDate: {
-              gte: new Date(today.getFullYear(), today.getMonth(), 1),
-              lte: new Date(today.getFullYear(), today.getMonth() + 1, 0),
-            },
-          },
-        },
-      },
+      include: { unit: true, tenant: true, property: true },
     });
 
     for (const tenancy of activeTenancies) {
       const dueDate = getNextDueDate(tenancy.startDate, tenancy.unit.paymentPeriod, today);
 
+      if (tenancy.endDate && tenancy.endDate < dueDate) {
+        logger.info(`[InvoiceJob] Tenancy ${tenancy.id} ended before this billing date, skipping`);
+        continue;
+      }
       if (!isDayAfter(dueDate, today)) continue;
-      if (tenancy.invoices.length > 0) {
-        logger.info(`[InvoiceJob] Invoice already exists for tenancy ${tenancy.id} this period, skipping`);
+
+      const billingPeriod = monthKey(dueDate);
+
+      // Fast pre-check to skip the common case cheaply; the
+      // (tenancyId, billingPeriod) unique constraint on Invoice is the
+      // actual idempotency guarantee below, in case two runs race past
+      // this check at the same time (e.g. a manual trigger overlapping
+      // the scheduled one).
+      const existing = await prisma.invoice.findFirst({
+        where: { tenancyId: tenancy.id, billingPeriod },
+      });
+      if (existing) {
+        logger.info(`[InvoiceJob] Draft already exists for tenancy ${tenancy.id}, period ${billingPeriod}, skipping`);
         continue;
       }
 
+      // Current rent, read fresh off the tenancy right now — not the
+      // unit's default listed rate, which can differ from what this
+      // specific tenant is actually paying (a negotiated rate, or a rent
+      // change applied after the lease started via the tenancy update
+      // endpoint).
       const unit = tenancy.unit;
       const charges = typeof unit.additionalCharges === 'string'
         ? JSON.parse(unit.additionalCharges || '{}')
         : (unit.additionalCharges || {});
       const items = [
-        { description: `Rent — ${unit.type} Unit ${unit.unitNumber}`, amount: Number(unit.rentAmount), type: 'rent' },
+        { description: `Rent — ${unit.type} Unit ${unit.unitNumber}`, amount: Number(tenancy.rentAmount), type: 'rent' },
       ];
       if (charges.utilities) items.push({ description: 'Utilities', amount: Number(charges.utilities), type: 'charge' });
       if (charges.security) items.push({ description: 'Security', amount: Number(charges.security), type: 'charge' });
       if (charges.garbage) items.push({ description: 'Garbage Collection', amount: Number(charges.garbage), type: 'charge' });
 
       const total = items.reduce((s, i) => s + i.amount, 0);
+
+      // Snapshot what this tenant already owes from before, so the new
+      // draft doesn't land in the queue looking like a routine invoice
+      // when they're actually behind.
+      const priorUnpaidAgg = await prisma.invoice.aggregate({
+        where: { tenancyId: tenancy.id, status: { in: ['SENT', 'OVERDUE'] } },
+        _sum: { amount: true },
+      });
+      const priorUnpaidAmount = Number(priorUnpaidAgg._sum.amount || 0);
 
       let invoiceNumber = generateInvoiceNumber();
       let attempts = 0;
@@ -101,21 +139,31 @@ async function processAutoInvoicing() {
         attempts++;
       }
 
-      const invoice = await prisma.invoice.create({
-        data: {
-          invoiceNumber,
-          tenancyId: tenancy.id,
-          unitId: tenancy.unitId,
-          propertyId: tenancy.propertyId,
-          tenantId: tenancy.tenantId,
-          amount: total,
-          dueDate,
-          items: JSON.stringify(items),
-          status: 'DRAFT',
-        },
-      });
+      try {
+        const invoice = await prisma.invoice.create({
+          data: {
+            invoiceNumber,
+            tenancyId: tenancy.id,
+            unitId: tenancy.unitId,
+            propertyId: tenancy.propertyId,
+            tenantId: tenancy.tenantId,
+            amount: total,
+            dueDate,
+            items: JSON.stringify(items),
+            status: 'DRAFT',
+            billingPeriod,
+            priorUnpaidAmount,
+          },
+        });
 
-      logger.info(`[InvoiceJob] Draft invoice ${invoice.invoiceNumber} created for ${tenancy.tenant.email}, pending review`);
+        logger.info(`[InvoiceJob] Draft invoice ${invoice.invoiceNumber} created for ${tenancy.tenant.email}, pending review${priorUnpaidAmount > 0 ? ` (tenant has ${priorUnpaidAmount} outstanding from before)` : ''}`);
+      } catch (err) {
+        if (err.code === 'P2002') {
+          logger.info(`[InvoiceJob] Draft for tenancy ${tenancy.id}, period ${billingPeriod} was created by a concurrent run, skipping`);
+        } else {
+          throw err;
+        }
+      }
     }
 
     logger.info('[InvoiceJob] Auto-invoicing check complete');
