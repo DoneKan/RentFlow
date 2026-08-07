@@ -70,7 +70,13 @@ app.use(limiter);
 
 // Parsing & utilities
 app.use(compression());
-app.use(express.json({ limit: '10mb' }));
+// `verify` stashes the exact raw bytes onto req.rawBody — webhook signature
+// checks must hash the raw body, not a re-serialized copy of req.body
+// (whitespace/key-order differences would break the HMAC comparison).
+app.use(express.json({
+  limit: '10mb',
+  verify: (req, res, buf) => { req.rawBody = buf; },
+}));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 if (process.env.NODE_ENV !== 'test') {

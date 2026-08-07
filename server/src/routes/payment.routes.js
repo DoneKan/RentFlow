@@ -3,6 +3,7 @@ const Joi = require('joi');
 const controller = require('../controllers/payment.controller');
 const { authenticate, authorize } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
+const { verifyWebhookSignature } = require('../middleware/webhookSignature');
 
 const router = Router();
 
@@ -30,7 +31,15 @@ router.get('/:id', authenticate, controller.getOne);
 router.get('/:id/receipt', authenticate, controller.getReceipt);
 router.post('/mtn/initiate', authenticate, validate(mtnSchema), controller.initiateMtn);
 router.post('/airtel/initiate', authenticate, validate(airtelSchema), controller.initiateAirtel);
-router.post('/webhook/mtn', controller.webhookMtn);
-router.post('/webhook/airtel', controller.webhookAirtel);
+router.post(
+  '/webhook/mtn',
+  verifyWebhookSignature({ headerName: 'X-Mtn-Signature', secretEnvVar: 'MTN_WEBHOOK_SECRET' }),
+  controller.webhookMtn
+);
+router.post(
+  '/webhook/airtel',
+  verifyWebhookSignature({ headerName: 'X-Airtel-Signature', secretEnvVar: 'AIRTEL_WEBHOOK_SECRET' }),
+  controller.webhookAirtel
+);
 
 module.exports = router;
