@@ -40,7 +40,7 @@ export default function PropertyDetailPage() {
   const deleteProperty = useDeleteProperty()
   const { data: property, isLoading } = useProperty(id)
   const { data: unitsData, isLoading: unitsLoading } = usePropertyUnits(id)
-  const { data: expensesData, isLoading: expensesLoading } = useExpenses({ propertyId: id })
+  const { data: expensesData, isLoading: expensesLoading } = useExpenses({ propertyId: id, limit: 1000 })
   const { data: maintenanceData } = useMaintenance({ propertyId: id })
 
   const units = unitsData || []

@@ -9,7 +9,7 @@ import ConfirmDialog from '../../components/ui/ConfirmDialog'
 import Modal from '../../components/ui/Modal'
 import LogExpenseForm from '../../components/forms/LogExpenseForm'
 import StatusBadge from '../../components/ui/StatusBadge'
-import { getExpenses, getExpenseSummary, deleteExpense } from '../../services/expense.service'
+import { getExpenses, deleteExpense } from '../../services/expense.service'
 import { formatCurrency, formatDate } from '../../utils/formatters'
 
 const CATEGORY_COLORS = {
@@ -45,23 +45,20 @@ export default function ExpensesPage() {
   const [deleteId, setDeleteId] = useState(null)
   const [categoryFilter, setCategoryFilter] = useState('ALL')
 
+  // limit is generous rather than paginated — every card and total on this
+  // page (Total Expenses, per-category cards, the table) derives from this
+  // one fetched array, so it has to actually hold every expense or all of
+  // them silently under-count together, not just the visible list.
   const { data: expensesRes, isLoading } = useQuery({
     queryKey: ['expenses'],
-    queryFn: () => getExpenses(),
+    queryFn: () => getExpenses({ limit: 1000 }),
     select: (r) => r.data || [],
-  })
-
-  const { data: summaryRes } = useQuery({
-    queryKey: ['expense-summary'],
-    queryFn: () => getExpenseSummary(),
-    select: (r) => r.data || {},
   })
 
   const deleteMutation = useMutation({
     mutationFn: deleteExpense,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['expenses'] })
-      queryClient.invalidateQueries({ queryKey: ['expense-summary'] })
       toast.success('Expense deleted')
       setDeleteId(null)
     },
@@ -70,8 +67,14 @@ export default function ExpensesPage() {
 
   const expenses = expensesRes || []
   const filtered = categoryFilter === 'ALL' ? expenses : expenses.filter(e => e.category === categoryFilter)
-  const summary = summaryRes || {}
   const totalExpenses = expenses.reduce((s, e) => s + Number(e.amount), 0)
+  // Per-category totals computed from this same array — not a separate
+  // /expenses/summary request — so they can never drift from Total
+  // Expenses or from what's actually in the table below.
+  const categoryTotals = expenses.reduce((acc, e) => {
+    acc[e.category] = (acc[e.category] || 0) + Number(e.amount)
+    return acc
+  }, {})
 
   const columns = [
     { key: 'date', label: 'Date', render: (v) => formatDate(v) },
@@ -106,13 +109,17 @@ export default function ExpensesPage() {
     },
   ]
 
+  // One card per category in CATEGORY_LABELS — the same source the filter
+  // tabs below are built from — so a new category never needs this list
+  // updated separately (that drift is exactly how the old hardcoded
+  // 5-category card list went stale).
   const summaryCards = [
     { title: 'Total Expenses', value: formatCurrency(totalExpenses), color: 'bg-red-50 text-red-700' },
-    { title: '💡 Utilities', value: formatCurrency(summary.UTILITIES || 0), color: 'bg-blue-50 text-blue-700' },
-    { title: '🔒 Security', value: formatCurrency(summary.SECURITY || 0), color: 'bg-orange-50 text-orange-700' },
-    { title: '🔧 Maintenance', value: formatCurrency(summary.MAINTENANCE || 0), color: 'bg-yellow-50 text-yellow-700' },
-    { title: '🏛 KCCA Tax', value: formatCurrency(summary.KCCA_TAX || 0), color: 'bg-red-50 text-red-700' },
-    { title: '📋 URA Tax', value: formatCurrency(summary.URA_TAX || 0), color: 'bg-rose-50 text-rose-700' },
+    ...Object.entries(CATEGORY_LABELS).map(([key, label]) => ({
+      title: label,
+      value: formatCurrency(categoryTotals[key] || 0),
+      color: 'bg-gray-50 text-gray-700',
+    })),
   ]
 
   return (
@@ -170,7 +177,6 @@ export default function ExpensesPage() {
           expense={editExpense}
           onSuccess={() => {
             queryClient.invalidateQueries({ queryKey: ['expenses'] })
-            queryClient.invalidateQueries({ queryKey: ['expense-summary'] })
           }}
         />
       </Modal>
