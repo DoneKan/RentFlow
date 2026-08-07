@@ -7,6 +7,8 @@ const { verifyWebhookSignature } = require('../middleware/webhookSignature');
 
 const router = Router();
 
+const STAFF_ROLES = ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'LANDLORD'];
+
 const manualPaymentSchema = Joi.object({
   invoiceId: Joi.string().required(),
   amount: Joi.number().positive().allow(null),
@@ -25,12 +27,12 @@ const airtelSchema = Joi.object({
   mobileNumber: Joi.string().required(),
 });
 
-router.get('/', authenticate, controller.list);
-router.post('/', authenticate, authorize('SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'LANDLORD'), validate(manualPaymentSchema), controller.recordManual);
-router.get('/:id', authenticate, controller.getOne);
-router.get('/:id/receipt', authenticate, controller.getReceipt);
-router.post('/mtn/initiate', authenticate, validate(mtnSchema), controller.initiateMtn);
-router.post('/airtel/initiate', authenticate, validate(airtelSchema), controller.initiateAirtel);
+router.get('/', authenticate, authorize(...STAFF_ROLES), controller.list);
+router.post('/', authenticate, authorize(...STAFF_ROLES), validate(manualPaymentSchema), controller.recordManual);
+router.get('/:id', authenticate, authorize(...STAFF_ROLES), controller.getOne);
+router.get('/:id/receipt', authenticate, authorize(...STAFF_ROLES), controller.getReceipt);
+router.post('/mtn/initiate', authenticate, authorize(...STAFF_ROLES), validate(mtnSchema), controller.initiateMtn);
+router.post('/airtel/initiate', authenticate, authorize(...STAFF_ROLES), validate(airtelSchema), controller.initiateAirtel);
 router.post(
   '/webhook/mtn',
   verifyWebhookSignature({ headerName: 'X-Mtn-Signature', secretEnvVar: 'MTN_WEBHOOK_SECRET' }),

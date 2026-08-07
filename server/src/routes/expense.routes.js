@@ -7,6 +7,8 @@ const { uploadSingle } = require('../middleware/upload');
 
 const router = Router();
 
+const STAFF_ROLES = ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'LANDLORD'];
+
 const createSchema = Joi.object({
   propertyId: Joi.string().required(),
   unitId: Joi.string().allow('', null),
@@ -26,11 +28,11 @@ const updateSchema = Joi.object({
   vendor: Joi.string().allow('', null),
 });
 
-router.get('/summary', authenticate, controller.summary);
-router.get('/', authenticate, controller.list);
-router.post('/', authenticate, authorize('SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'LANDLORD'), uploadSingle('receipt'), validate(createSchema), controller.create);
-router.get('/:id', authenticate, controller.getOne);
-router.put('/:id', authenticate, authorize('SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'LANDLORD'), uploadSingle('receipt'), validate(updateSchema), controller.update);
-router.delete('/:id', authenticate, authorize('SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'LANDLORD'), controller.remove);
+router.get('/summary', authenticate, authorize(...STAFF_ROLES), controller.summary);
+router.get('/', authenticate, authorize(...STAFF_ROLES), controller.list);
+router.post('/', authenticate, authorize(...STAFF_ROLES), uploadSingle('receipt'), validate(createSchema), controller.create);
+router.get('/:id', authenticate, authorize(...STAFF_ROLES), controller.getOne);
+router.put('/:id', authenticate, authorize(...STAFF_ROLES), uploadSingle('receipt'), validate(updateSchema), controller.update);
+router.delete('/:id', authenticate, authorize(...STAFF_ROLES), controller.remove);
 
 module.exports = router;

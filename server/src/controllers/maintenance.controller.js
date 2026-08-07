@@ -84,7 +84,9 @@ async function create(req, res, next) {
     } else {
       const { tenancyId } = req.body;
       if (!tenancyId) throw ApiError.badRequest('tenancyId is required');
-      tenancy = await prisma.tenancy.findUnique({ where: { id: tenancyId } });
+      tenancy = await prisma.tenancy.findFirst({
+        where: { id: tenancyId, property: { organizationId: req.user.organizationId } },
+      });
       if (!tenancy) throw ApiError.notFound('Tenancy not found');
     }
 

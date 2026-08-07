@@ -6,6 +6,8 @@ const { validate } = require('../middleware/validate');
 
 const router = Router({ mergeParams: true });
 
+const STAFF_ROLES = ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'LANDLORD'];
+
 const createSchema = Joi.object({
   unitNumber: Joi.string().required(),
   floor: Joi.number().integer().allow(null),
@@ -32,12 +34,12 @@ const updateSchema = Joi.object({
 });
 
 // Standalone unit routes
-router.get('/', authenticate, controller.list);
-router.get('/:id', authenticate, controller.getOne);
-router.put('/:id', authenticate, authorize('SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'LANDLORD'), validate(updateSchema), controller.update);
-router.delete('/:id', authenticate, authorize('SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'LANDLORD'), controller.remove);
+router.get('/', authenticate, authorize(...STAFF_ROLES), controller.list);
+router.get('/:id', authenticate, authorize(...STAFF_ROLES), controller.getOne);
+router.put('/:id', authenticate, authorize(...STAFF_ROLES), validate(updateSchema), controller.update);
+router.delete('/:id', authenticate, authorize(...STAFF_ROLES), controller.remove);
 
 // Nested under property (mergeParams)
-router.post('/', authenticate, authorize('SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'LANDLORD'), validate(createSchema), controller.create);
+router.post('/', authenticate, authorize(...STAFF_ROLES), validate(createSchema), controller.create);
 
 module.exports = router;

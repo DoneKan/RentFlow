@@ -6,6 +6,8 @@ const { validate } = require('../middleware/validate');
 
 const router = Router();
 
+const STAFF_ROLES = ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'LANDLORD'];
+
 const createSchema = Joi.object({
   name: Joi.string().min(2).max(200).required(),
   type: Joi.string().valid('RESIDENTIAL', 'COMMERCIAL', 'MIXED').default('RESIDENTIAL'),
@@ -33,12 +35,12 @@ const updateSchema = Joi.object({
   isActive: Joi.boolean(),
 });
 
-router.get('/vacant', authenticate, controller.getVacant);
-router.get('/', authenticate, controller.list);
-router.post('/', authenticate, authorize('SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'LANDLORD'), validate(createSchema), controller.create);
-router.get('/:id', authenticate, controller.getOne);
-router.put('/:id', authenticate, authorize('SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'LANDLORD'), validate(updateSchema), controller.update);
+router.get('/vacant', authenticate, authorize(...STAFF_ROLES), controller.getVacant);
+router.get('/', authenticate, authorize(...STAFF_ROLES), controller.list);
+router.post('/', authenticate, authorize(...STAFF_ROLES), validate(createSchema), controller.create);
+router.get('/:id', authenticate, authorize(...STAFF_ROLES), controller.getOne);
+router.put('/:id', authenticate, authorize(...STAFF_ROLES), validate(updateSchema), controller.update);
 router.delete('/:id', authenticate, authorize('SUPER_ADMIN', 'ADMIN'), controller.remove);
-router.get('/:id/units', authenticate, controller.getUnits);
+router.get('/:id/units', authenticate, authorize(...STAFF_ROLES), controller.getUnits);
 
 module.exports = router;
