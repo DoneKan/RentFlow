@@ -1,7 +1,7 @@
 import api from './api'
 
-export const getDashboard = () =>
-  api.get('/reports/dashboard').then((r) => r.data)
+export const getDashboard = (params) =>
+  api.get('/reports/dashboard', { params }).then((r) => r.data)
 
 export const getFinancialOverview = (params) =>
   api.get('/reports/financial/overview', { params }).then((r) => r.data)

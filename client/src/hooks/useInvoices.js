@@ -28,6 +28,17 @@ export function useCreateInvoice() {
   })
 }
 
+export function useUpdateInvoice() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: invoiceService.updateInvoice,
+    onSuccess: (_, { id }) => {
+      qc.invalidateQueries({ queryKey: INVOICES_KEY })
+      qc.invalidateQueries({ queryKey: ['invoice', id] })
+    },
+  })
+}
+
 export function useSendInvoice() {
   const qc = useQueryClient()
   return useMutation({

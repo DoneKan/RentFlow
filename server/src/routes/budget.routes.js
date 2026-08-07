@@ -7,7 +7,7 @@ const { validate } = require('../middleware/validate');
 const router = Router();
 
 const STAFF_ROLES = ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'LANDLORD'];
-const CATEGORIES = ['UTILITIES', 'SECURITY', 'MAINTENANCE', 'KCCA_TAX', 'URA_TAX', 'REPAIRS', 'INSURANCE', 'OTHER', 'RENTAL_INCOME'];
+const CATEGORIES = ['UTILITIES', 'SECURITY', 'MAINTENANCE', 'KCCA_TAX', 'URA_TAX', 'REPAIRS', 'INSURANCE', 'LAND_ACQUISITION', 'CONSTRUCTION', 'OTHER', 'RENTAL_INCOME'];
 
 const lineSchema = Joi.object({
   category: Joi.string().valid(...CATEGORIES).required(),

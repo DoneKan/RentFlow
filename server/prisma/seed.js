@@ -234,7 +234,7 @@ async function main() {
 
   const tenancies = [];
   for (const def of tenancyDefs) {
-    const existing = await prisma.tenancy.findUnique({ where: { unitId: def.unit.id } });
+    const existing = await prisma.tenancy.findFirst({ where: { unitId: def.unit.id, status: 'ACTIVE' } });
     if (existing) {
       tenancies.push(existing);
       continue;

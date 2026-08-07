@@ -2,19 +2,24 @@ import { useState, useEffect } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useQuery } from '@tanstack/react-query'
-import { useCreateInvoice } from '../../hooks/useInvoices'
+import { useCreateInvoice, useUpdateInvoice } from '../../hooks/useInvoices'
 import { getTenants, getTenant } from '../../services/tenant.service'
 import { formatCurrency } from '../../utils/formatters'
 import { addDays, format } from 'date-fns'
 
-export default function GenerateInvoiceForm({ onClose, defaultTenantId }) {
+export default function GenerateInvoiceForm({ onClose, defaultTenantId, invoice }) {
+  const isEditing = !!invoice
   const create = useCreateInvoice()
-  // tenancyId is the selected tenancy ID (what the API expects)
-  const [tenancyId, setTenancyId] = useState('')
-  const [dueDate, setDueDate] = useState(format(addDays(new Date(), 7), 'yyyy-MM-dd'))
-  const [latePenalty, setLatePenalty] = useState('')
-  const [notes, setNotes] = useState('')
-  const [items, setItems] = useState([])
+  const update = useUpdateInvoice()
+  const saving = isEditing ? update.isPending : create.isPending
+  // tenancyId is the selected tenancy ID (what the API expects) — fixed once editing
+  const [tenancyId, setTenancyId] = useState(invoice?.tenancyId || '')
+  const [dueDate, setDueDate] = useState(
+    invoice?.dueDate ? invoice.dueDate.split('T')[0] : format(addDays(new Date(), 7), 'yyyy-MM-dd')
+  )
+  const [latePenalty, setLatePenalty] = useState(invoice?.latePenalty ? String(invoice.latePenalty) : '')
+  const [notes, setNotes] = useState(invoice?.notes || '')
+  const [items, setItems] = useState(invoice?.items || [])
 
   // Tenant list returns tenancies
   const { data: tenancies } = useQuery({
@@ -40,6 +45,7 @@ export default function GenerateInvoiceForm({ onClose, defaultTenantId }) {
   })
 
   useEffect(() => {
+    if (isEditing) return
     if (tenancyData?.unit) {
       const unit = tenancyData.unit
       const charges = typeof unit.additionalCharges === 'string'
@@ -67,18 +73,30 @@ export default function GenerateInvoiceForm({ onClose, defaultTenantId }) {
     e.preventDefault()
     if (!tenancyId) { toast.error('Please select a tenant'); return }
     if (items.length === 0) { toast.error('Add at least one invoice item'); return }
+    const customItems = items.map((i) => ({ ...i, amount: parseFloat(i.amount) || 0 }))
     try {
-      await create.mutateAsync({
-        tenancyId,
-        dueDate,
-        latePenalty: latePenalty ? parseFloat(latePenalty) : 0,
-        customItems: items.map((i) => ({ ...i, amount: parseFloat(i.amount) || 0 })),
-        notes,
-      })
-      toast.success('Invoice generated!')
+      if (isEditing) {
+        await update.mutateAsync({
+          id: invoice.id,
+          dueDate,
+          latePenalty: latePenalty ? parseFloat(latePenalty) : 0,
+          customItems,
+          notes,
+        })
+        toast.success('Draft updated!')
+      } else {
+        await create.mutateAsync({
+          tenancyId,
+          dueDate,
+          latePenalty: latePenalty ? parseFloat(latePenalty) : 0,
+          customItems,
+          notes,
+        })
+        toast.success('Invoice generated!')
+      }
       onClose()
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to generate invoice')
+      toast.error(err.response?.data?.message || `Failed to ${isEditing ? 'update draft' : 'generate invoice'}`)
     }
   }
 
@@ -86,14 +104,23 @@ export default function GenerateInvoiceForm({ onClose, defaultTenantId }) {
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
         <label className="label">Tenant *</label>
-        <select value={tenancyId} onChange={(e) => setTenancyId(e.target.value)} className="input" required>
-          <option value="">Select tenant…</option>
-          {(tenancies || []).map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.tenant?.name} — {t.property?.name} Unit {t.unit?.unitNumber}
-            </option>
-          ))}
-        </select>
+        {isEditing ? (
+          <input
+            value={`${invoice.tenant?.name || ''} — ${invoice.property?.name || ''} Unit ${invoice.unit?.unitNumber || ''}`}
+            className="input bg-gray-50 text-gray-500"
+            disabled
+            title="Tenant can't be changed on an existing draft — cancel it and generate a new one instead"
+          />
+        ) : (
+          <select value={tenancyId} onChange={(e) => setTenancyId(e.target.value)} className="input" required>
+            <option value="">Select tenant…</option>
+            {(tenancies || []).map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.tenant?.name} — {t.property?.name} Unit {t.unit?.unitNumber}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
 
       {items.length > 0 && (
@@ -158,8 +185,8 @@ export default function GenerateInvoiceForm({ onClose, defaultTenantId }) {
 
       <div className="flex gap-3 pt-1">
         <button type="button" onClick={onClose} className="btn-secondary flex-1">Cancel</button>
-        <button type="submit" disabled={create.isPending} className="btn-primary flex-1">
-          {create.isPending ? 'Generating…' : 'Generate Invoice'}
+        <button type="submit" disabled={saving} className="btn-primary flex-1">
+          {isEditing ? (saving ? 'Saving…' : 'Save Draft') : (saving ? 'Generating…' : 'Generate Invoice')}
         </button>
       </div>
     </form>

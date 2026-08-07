@@ -1,8 +1,7 @@
 const cron = require('node-cron');
 const { PrismaClient } = require('@prisma/client');
 const { generateInvoiceNumber } = require('../utils/generateCode');
-const { generateInvoice } = require('../utils/pdfGenerator');
-const { sendInvoiceEmail, sendDemandNotice } = require('../utils/emailService');
+const { sendDemandNotice } = require('../utils/emailService');
 const logger = require('../utils/logger');
 
 const prisma = new PrismaClient();
@@ -40,6 +39,17 @@ function isSameDayOfMonth(date1, date2) {
     date1.getFullYear() === date2.getFullYear();
 }
 
+function isDayAfter(date1, date2) {
+  const dayAfter = new Date(date1);
+  dayAfter.setDate(dayAfter.getDate() + 1);
+  return isSameDayOfMonth(dayAfter, date2);
+}
+
+// Drafts a rent invoice one day after each active tenancy's billing day —
+// it does NOT send it. Drafts sit in the "Draft" queue for staff to review,
+// edit line items on, and explicitly send (or cancel). This never emails a
+// tenant or a PDF on its own; that only happens via invoice.controller's
+// sendInvoice, triggered by a human clicking Send.
 async function processAutoInvoicing() {
   logger.info('[InvoiceJob] Running auto-invoicing check...');
   const today = new Date();
@@ -66,7 +76,7 @@ async function processAutoInvoicing() {
     for (const tenancy of activeTenancies) {
       const dueDate = getNextDueDate(tenancy.startDate, tenancy.unit.paymentPeriod, today);
 
-      if (!isSameDayOfMonth(dueDate, today)) continue;
+      if (!isDayAfter(dueDate, today)) continue;
       if (tenancy.invoices.length > 0) {
         logger.info(`[InvoiceJob] Invoice already exists for tenancy ${tenancy.id} this period, skipping`);
         continue;
@@ -102,18 +112,11 @@ async function processAutoInvoicing() {
           amount: total,
           dueDate,
           items: JSON.stringify(items),
-          status: 'SENT',
-          sentAt: new Date(),
+          status: 'DRAFT',
         },
       });
 
-      try {
-        const pdfBuffer = await generateInvoice(invoice, tenancy.tenant, tenancy.unit, tenancy.property);
-        await sendInvoiceEmail(tenancy.tenant, invoice, tenancy.unit, tenancy.property, pdfBuffer);
-        logger.info(`[InvoiceJob] Invoice ${invoice.invoiceNumber} sent to ${tenancy.tenant.email}`);
-      } catch (e) {
-        logger.error(`[InvoiceJob] Failed to send invoice ${invoice.invoiceNumber}: ${e.message}`);
-      }
+      logger.info(`[InvoiceJob] Draft invoice ${invoice.invoiceNumber} created for ${tenancy.tenant.email}, pending review`);
     }
 
     logger.info('[InvoiceJob] Auto-invoicing check complete');
@@ -169,4 +172,20 @@ function initializeJobs() {
   logger.info('[InvoiceJob] Cron jobs initialized (auto-invoice @ 8 AM, overdue @ 9 AM EAT)');
 }
 
-module.exports = { initializeJobs, processAutoInvoicing, processOverdueInvoices };
+// A SENT invoice only becomes OVERDUE once the daily cron runs, so any read
+// path that filters/displays overdue status can lag up to 24h behind the
+// real due date. Call this first (scoped to the caller's org) to flip
+// already-due invoices before querying, without waiting on the cron.
+// Doesn't send demand-notice emails — that stays the cron's job, exactly once.
+async function syncOverdueStatuses(organizationId) {
+  await prisma.invoice.updateMany({
+    where: {
+      status: 'SENT',
+      dueDate: { lt: new Date() },
+      property: { organizationId },
+    },
+    data: { status: 'OVERDUE' },
+  });
+}
+
+module.exports = { initializeJobs, processAutoInvoicing, processOverdueInvoices, syncOverdueStatuses };

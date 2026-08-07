@@ -1,4 +1,4 @@
-const EXPENSE_CATEGORIES = ['UTILITIES', 'SECURITY', 'MAINTENANCE', 'KCCA_TAX', 'URA_TAX', 'REPAIRS', 'INSURANCE', 'OTHER'];
+const EXPENSE_CATEGORIES = ['UTILITIES', 'SECURITY', 'MAINTENANCE', 'KCCA_TAX', 'URA_TAX', 'REPAIRS', 'INSURANCE', 'LAND_ACQUISITION', 'CONSTRUCTION', 'OTHER'];
 
 function titleCase(code) {
   return code.split('_').map((w) => w[0] + w.slice(1).toLowerCase()).join(' ');

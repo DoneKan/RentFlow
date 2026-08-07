@@ -4,6 +4,7 @@ const ApiResponse = require('../utils/ApiResponse');
 const { generateInvoiceNumber } = require('../utils/generateCode');
 const { generateInvoice } = require('../utils/pdfGenerator');
 const { sendInvoiceEmail, sendRentReminder, sendDemandNotice } = require('../utils/emailService');
+const { syncOverdueStatuses } = require('../jobs/invoiceJob');
 const logger = require('../utils/logger');
 
 const prisma = new PrismaClient();
@@ -60,6 +61,8 @@ async function list(req, res, next) {
   try {
     const { page = 1, limit = 20, status, propertyId, tenantId } = req.query;
     const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    await syncOverdueStatuses(req.user.organizationId);
 
     const where = {
       property: { organizationId: req.user.organizationId },
@@ -141,6 +144,46 @@ async function create(req, res, next) {
     });
 
     return ApiResponse.created(res, parseInvoiceItems(invoice), 'Invoice created');
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function update(req, res, next) {
+  try {
+    const invoice = await prisma.invoice.findFirst({
+      where: {
+        id: req.params.id,
+        property: { organizationId: req.user.organizationId },
+      },
+    });
+    if (!invoice) throw ApiError.notFound('Invoice not found');
+    if (invoice.status !== 'DRAFT') {
+      throw ApiError.badRequest('Only draft invoices can be edited — send or cancel it instead');
+    }
+
+    const { dueDate, latePenalty, customItems, notes } = req.body;
+    const items = customItems || JSON.parse(invoice.items || '[]');
+    const penalty = latePenalty !== undefined ? Number(latePenalty) : Number(invoice.latePenalty || 0);
+    const total = items.reduce((sum, i) => sum + Number(i.amount), 0) + penalty;
+
+    const updated = await prisma.invoice.update({
+      where: { id: invoice.id },
+      data: {
+        ...(dueDate && { dueDate: new Date(dueDate) }),
+        ...(latePenalty !== undefined && { latePenalty: penalty }),
+        ...(notes !== undefined && { notes }),
+        ...(customItems && { items: JSON.stringify(customItems) }),
+        amount: total,
+      },
+      include: {
+        tenant: { select: { id: true, name: true, email: true } },
+        unit: { select: { id: true, unitNumber: true, type: true } },
+        property: { select: { id: true, name: true, code: true } },
+      },
+    });
+
+    return ApiResponse.success(res, parseInvoiceItems(updated), 'Invoice updated');
   } catch (err) {
     next(err);
   }
@@ -247,4 +290,4 @@ async function cancel(req, res, next) {
   }
 }
 
-module.exports = { list, create, getOne, sendInvoice, sendReminder, cancel, buildInvoiceItems };
+module.exports = { list, create, update, getOne, sendInvoice, sendReminder, cancel, buildInvoiceItems };

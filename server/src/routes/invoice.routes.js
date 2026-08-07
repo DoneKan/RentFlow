@@ -20,9 +20,23 @@ const createSchema = Joi.object({
   notes: Joi.string().allow('', null),
 });
 
+const updateSchema = Joi.object({
+  dueDate: Joi.date(),
+  latePenalty: Joi.number().min(0),
+  customItems: Joi.array().items(
+    Joi.object({
+      description: Joi.string().required(),
+      amount: Joi.number().positive().required(),
+      type: Joi.string().default('charge'),
+    })
+  ),
+  notes: Joi.string().allow('', null),
+}).min(1);
+
 router.get('/', authenticate, controller.list);
 router.post('/', authenticate, authorize('SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'LANDLORD'), validate(createSchema), controller.create);
 router.get('/:id', authenticate, controller.getOne);
+router.put('/:id', authenticate, authorize('SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'LANDLORD'), validate(updateSchema), controller.update);
 router.post('/:id/send', authenticate, authorize('SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'LANDLORD'), controller.sendInvoice);
 router.post('/:id/remind', authenticate, authorize('SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'LANDLORD'), controller.sendReminder);
 router.put('/:id/cancel', authenticate, authorize('SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'LANDLORD'), controller.cancel);

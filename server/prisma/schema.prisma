@@ -119,7 +119,7 @@ model Unit {
   updatedAt         DateTime @updatedAt
 
   property            Property             @relation(fields: [propertyId], references: [id])
-  tenancy             Tenancy?
+  tenancies           Tenancy[]
   invoices            Invoice[]
   maintenanceRequests MaintenanceRequest[]
   expenses            Expense[]
@@ -132,7 +132,7 @@ model Unit {
 
 model Tenancy {
   id            String    @id @default(cuid())
-  unitId        String    @unique
+  unitId        String
   tenantId      String
   propertyId    String
   startDate     DateTime
@@ -151,6 +151,7 @@ model Tenancy {
   maintenanceRequests MaintenanceRequest[]
   leaseDocuments      LeaseDocument[]
 
+  @@index([unitId])
   @@index([tenantId])
   @@index([propertyId])
   @@index([status])

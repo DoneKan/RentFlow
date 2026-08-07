@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { format, differenceInCalendarDays } from 'date-fns'
 import {
@@ -12,6 +13,7 @@ import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { useAuth } from '../../context/AuthContext'
 import { getDashboard } from '../../services/report.service'
+import { getProperties } from '../../services/property.service'
 import { formatCurrency, formatDate, getPaymentMethodLabel } from '../../utils/formatters'
 import StatCard from '../../components/ui/StatCard'
 import StatusBadge from '../../components/ui/StatusBadge'
@@ -31,10 +33,17 @@ export default function DashboardPage() {
   const { user } = useAuth()
   const navigate = useNavigate()
   const sendReminder = useSendReminder()
+  const [propertyId, setPropertyId] = useState('')
+
+  const { data: propertiesList } = useQuery({
+    queryKey: ['properties', 'all'],
+    queryFn: () => getProperties({ limit: 200 }),
+    select: (r) => r.data || [],
+  })
 
   const { data, isLoading } = useQuery({
-    queryKey: ['dashboard'],
-    queryFn: getDashboard,
+    queryKey: ['dashboard', propertyId],
+    queryFn: () => getDashboard(propertyId ? { propertyId } : undefined),
     select: (r) => r.data,
     refetchOnMount: 'always',
   })
@@ -92,11 +101,23 @@ export default function DashboardPage() {
           </h1>
           <p className="text-sm text-gray-500">{format(new Date(), 'EEEE, MMMM d, yyyy')}</p>
         </div>
-        {user?.organization && (
-          <div className="text-sm text-gray-500 bg-white border border-gray-100 rounded-lg px-3 py-1.5">
-            {user.organization.name}
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          <select
+            value={propertyId}
+            onChange={(e) => setPropertyId(e.target.value)}
+            className="input text-sm py-1.5"
+          >
+            <option value="">All Properties</option>
+            {(propertiesList || []).map((p) => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
+          {user?.organization && (
+            <div className="text-sm text-gray-500 bg-white border border-gray-100 rounded-lg px-3 py-1.5">
+              {user.organization.name}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Stats */}

@@ -9,6 +9,9 @@ export const getInvoice = (id) =>
 export const createInvoice = (data) =>
   api.post('/invoices', data).then((r) => r.data)
 
+export const updateInvoice = ({ id, ...data }) =>
+  api.put(`/invoices/${id}`, data).then((r) => r.data)
+
 export const sendInvoice = (id) =>
   api.post(`/invoices/${id}/send`).then((r) => r.data)
 

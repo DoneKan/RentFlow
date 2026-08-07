@@ -5,7 +5,7 @@ import toast from 'react-hot-toast'
 import { useCreateBudget } from '../../hooks/useBudgets'
 import { getProperties } from '../../services/property.service'
 
-const CATEGORIES = ['RENTAL_INCOME', 'UTILITIES', 'SECURITY', 'MAINTENANCE', 'KCCA_TAX', 'URA_TAX', 'REPAIRS', 'INSURANCE', 'OTHER']
+const CATEGORIES = ['RENTAL_INCOME', 'UTILITIES', 'SECURITY', 'MAINTENANCE', 'KCCA_TAX', 'URA_TAX', 'REPAIRS', 'INSURANCE', 'LAND_ACQUISITION', 'CONSTRUCTION', 'OTHER']
 
 export default function AddBudgetForm({ onClose }) {
   const create = useCreateBudget()

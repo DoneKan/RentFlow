@@ -20,6 +20,8 @@ const CATEGORY_COLORS = {
   URA_TAX: 'bg-rose-100 text-rose-800',
   REPAIRS: 'bg-amber-100 text-amber-800',
   INSURANCE: 'bg-purple-100 text-purple-800',
+  LAND_ACQUISITION: 'bg-emerald-100 text-emerald-800',
+  CONSTRUCTION: 'bg-teal-100 text-teal-800',
   OTHER: 'bg-gray-100 text-gray-800',
 }
 
@@ -31,6 +33,8 @@ const CATEGORY_LABELS = {
   URA_TAX: '📋 URA Tax',
   REPAIRS: '🪛 Repairs',
   INSURANCE: '🛡 Insurance',
+  LAND_ACQUISITION: '🏗 Land / Acquisition',
+  CONSTRUCTION: '🧱 Construction',
   OTHER: '📦 Other',
 }
 

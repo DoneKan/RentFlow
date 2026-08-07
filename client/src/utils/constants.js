@@ -22,6 +22,8 @@ export const EXPENSE_CATEGORIES = [
   { value: 'KCCA_TAX', label: 'Local Authority Tax' },
   { value: 'URA_TAX', label: 'Income / Rental Tax' },
   { value: 'INSURANCE', label: 'Insurance' },
+  { value: 'LAND_ACQUISITION', label: 'Land / Property Acquisition' },
+  { value: 'CONSTRUCTION', label: 'Construction' },
   { value: 'OTHER', label: 'Other' },
 ]
 

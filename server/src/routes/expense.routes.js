@@ -10,7 +10,7 @@ const router = Router();
 const createSchema = Joi.object({
   propertyId: Joi.string().required(),
   unitId: Joi.string().allow('', null),
-  category: Joi.string().valid('UTILITIES', 'SECURITY', 'MAINTENANCE', 'KCCA_TAX', 'URA_TAX', 'REPAIRS', 'INSURANCE', 'OTHER').default('OTHER'),
+  category: Joi.string().valid('UTILITIES', 'SECURITY', 'MAINTENANCE', 'KCCA_TAX', 'URA_TAX', 'REPAIRS', 'INSURANCE', 'LAND_ACQUISITION', 'CONSTRUCTION', 'OTHER').default('OTHER'),
   amount: Joi.number().positive().required(),
   description: Joi.string().required(),
   date: Joi.date().required(),
@@ -19,7 +19,7 @@ const createSchema = Joi.object({
 
 const updateSchema = Joi.object({
   unitId: Joi.string().allow('', null),
-  category: Joi.string().valid('UTILITIES', 'SECURITY', 'MAINTENANCE', 'KCCA_TAX', 'URA_TAX', 'REPAIRS', 'INSURANCE', 'OTHER'),
+  category: Joi.string().valid('UTILITIES', 'SECURITY', 'MAINTENANCE', 'KCCA_TAX', 'URA_TAX', 'REPAIRS', 'INSURANCE', 'LAND_ACQUISITION', 'CONSTRUCTION', 'OTHER'),
   amount: Joi.number().positive(),
   description: Joi.string(),
   date: Joi.date(),

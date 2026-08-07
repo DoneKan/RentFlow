@@ -30,13 +30,16 @@ const PIE_COLORS = {
   URA_TAX: '#dc2626',
   REPAIRS: '#f59e0b',
   INSURANCE: '#8b5cf6',
+  LAND_ACQUISITION: '#10b981',
+  CONSTRUCTION: '#14b8a6',
   OTHER: '#6b7280',
 }
 
 const CATEGORY_LABELS = {
   UTILITIES: 'Utilities', SECURITY: 'Security', MAINTENANCE: 'Maintenance',
   KCCA_TAX: 'KCCA Tax', URA_TAX: 'URA Tax', REPAIRS: 'Repairs',
-  INSURANCE: 'Insurance', OTHER: 'Other',
+  INSURANCE: 'Insurance', LAND_ACQUISITION: 'Land / Acquisition',
+  CONSTRUCTION: 'Construction', OTHER: 'Other',
 }
 
 const RANGE_PRESETS = [

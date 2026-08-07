@@ -1,6 +1,8 @@
 const { PrismaClient } = require('@prisma/client');
 const ApiError = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
+const { syncOverdueStatuses } = require('../jobs/invoiceJob');
+const { attachCurrentTenancy } = require('../utils/tenancyHelpers');
 
 const prisma = new PrismaClient();
 
@@ -37,9 +39,14 @@ function monthKey(date) {
 async function dashboard(req, res, next) {
   try {
     const orgId = req.user.organizationId;
+    const { propertyId } = req.query;
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+
+    await syncOverdueStatuses(orgId);
+
+    const propertyFilter = propertyId ? { propertyId } : {};
 
     const [
       totalProperties,
@@ -52,13 +59,15 @@ async function dashboard(req, res, next) {
       pendingInvoices,
       monthlyExpenses,
     ] = await Promise.all([
-      prisma.property.count({ where: { organizationId: orgId, isActive: true } }),
-      prisma.unit.count({ where: { property: { organizationId: orgId } } }),
-      prisma.unit.count({ where: { property: { organizationId: orgId }, status: 'OCCUPIED' } }),
-      prisma.tenancy.count({ where: { property: { organizationId: orgId }, status: 'ACTIVE' } }),
+      propertyId
+        ? prisma.property.count({ where: { organizationId: orgId, isActive: true, id: propertyId } })
+        : prisma.property.count({ where: { organizationId: orgId, isActive: true } }),
+      prisma.unit.count({ where: { property: { organizationId: orgId }, ...propertyFilter } }),
+      prisma.unit.count({ where: { property: { organizationId: orgId }, status: 'OCCUPIED', ...propertyFilter } }),
+      prisma.tenancy.count({ where: { property: { organizationId: orgId }, status: 'ACTIVE', ...propertyFilter } }),
       prisma.payment.aggregate({
         where: {
-          invoice: { property: { organizationId: orgId } },
+          invoice: { property: { organizationId: orgId }, ...propertyFilter },
           status: 'COMPLETED',
           paidAt: { gte: monthStart, lte: monthEnd },
         },
@@ -66,7 +75,7 @@ async function dashboard(req, res, next) {
         _count: true,
       }),
       prisma.invoice.findMany({
-        where: { property: { organizationId: orgId }, status: 'OVERDUE' },
+        where: { property: { organizationId: orgId }, status: 'OVERDUE', ...propertyFilter },
         include: {
           tenant: { select: { name: true, email: true } },
           unit: { select: { unitNumber: true } },
@@ -77,7 +86,7 @@ async function dashboard(req, res, next) {
       }),
       prisma.payment.findMany({
         where: {
-          invoice: { property: { organizationId: orgId } },
+          invoice: { property: { organizationId: orgId }, ...propertyFilter },
           status: 'COMPLETED',
         },
         include: {
@@ -94,12 +103,13 @@ async function dashboard(req, res, next) {
         take: 8,
       }),
       prisma.invoice.count({
-        where: { property: { organizationId: orgId }, status: { in: ['SENT', 'DRAFT'] } },
+        where: { property: { organizationId: orgId }, status: { in: ['SENT', 'DRAFT'] }, ...propertyFilter },
       }),
       prisma.expense.aggregate({
         where: {
           property: { organizationId: orgId },
           date: { gte: monthStart, lte: monthEnd },
+          ...propertyFilter,
         },
         _sum: { amount: true },
       }),
@@ -113,7 +123,7 @@ async function dashboard(req, res, next) {
     // Reuse the same overview computation the Reports page uses, for the
     // true outstanding balance (not just the 10 overdue invoices shown here)
     // and the 6-month revenue/expense trend.
-    const overview = await computeOverview(orgId, monthStart, monthEnd);
+    const overview = await computeOverview(orgId, monthStart, monthEnd, propertyId);
 
     return ApiResponse.success(res, {
       properties: { total: totalProperties },
@@ -138,11 +148,14 @@ async function dashboard(req, res, next) {
 
 // Core data for the "Overall" financial report: totals, expense category
 // split, outstanding/collection metrics, and a trailing 6-month trend.
-async function computeOverview(orgId, start, end) {
+// `propertyId`, when given, scopes every figure to that one property —
+// used by the Dashboard's property filter.
+async function computeOverview(orgId, start, end, propertyId) {
+  const propertyFilter = propertyId ? { propertyId } : {};
   const [revenueAgg, expensesByCategory, outstandingAgg, invoicedAgg] = await Promise.all([
     prisma.payment.aggregate({
       where: {
-        invoice: { property: { organizationId: orgId } },
+        invoice: { property: { organizationId: orgId }, ...propertyFilter },
         status: 'COMPLETED',
         paidAt: { gte: start, lte: end },
       },
@@ -151,7 +164,7 @@ async function computeOverview(orgId, start, end) {
     }),
     prisma.expense.groupBy({
       by: ['category'],
-      where: { property: { organizationId: orgId }, date: { gte: start, lte: end } },
+      where: { property: { organizationId: orgId }, date: { gte: start, lte: end }, ...propertyFilter },
       _sum: { amount: true },
       _count: true,
     }),
@@ -160,12 +173,13 @@ async function computeOverview(orgId, start, end) {
         property: { organizationId: orgId },
         status: { in: ['SENT', 'OVERDUE'] },
         dueDate: { lte: end },
+        ...propertyFilter,
       },
       _sum: { amount: true },
       _count: true,
     }),
     prisma.invoice.aggregate({
-      where: { property: { organizationId: orgId }, dueDate: { gte: start, lte: end } },
+      where: { property: { organizationId: orgId }, dueDate: { gte: start, lte: end }, ...propertyFilter },
       _sum: { amount: true },
       _count: true,
     }),
@@ -186,14 +200,14 @@ async function computeOverview(orgId, start, end) {
   const [trendPayments, trendExpenses] = await Promise.all([
     prisma.payment.findMany({
       where: {
-        invoice: { property: { organizationId: orgId } },
+        invoice: { property: { organizationId: orgId }, ...propertyFilter },
         status: 'COMPLETED',
         paidAt: { gte: trendStartMonth, lte: trendEnd },
       },
       select: { amount: true, paidAt: true },
     }),
     prisma.expense.findMany({
-      where: { property: { organizationId: orgId }, date: { gte: trendStartMonth, lte: trendEnd } },
+      where: { property: { organizationId: orgId }, date: { gte: trendStartMonth, lte: trendEnd }, ...propertyFilter },
       select: { amount: true, date: true },
     }),
   ]);
@@ -388,8 +402,7 @@ async function propertyReport(req, res, next) {
       prisma.unit.findMany({
         where: { propertyId: id },
         include: {
-          tenancy: {
-            where: { status: 'ACTIVE' },
+          tenancies: {
             include: { tenant: { select: { name: true, email: true, phone: true } } },
           },
         },
@@ -430,7 +443,7 @@ async function propertyReport(req, res, next) {
         total: units.length,
         occupied: units.filter((u) => u.status === 'OCCUPIED').length,
         vacant: units.filter((u) => u.status === 'VACANT').length,
-        details: units,
+        details: units.map(attachCurrentTenancy),
       },
       invoices,
       expenses,

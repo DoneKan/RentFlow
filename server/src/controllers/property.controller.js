@@ -2,6 +2,7 @@ const { PrismaClient } = require('@prisma/client');
 const ApiError = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
 const { generatePropertyCode } = require('../utils/generateCode');
+const { attachCurrentTenancy } = require('../utils/tenancyHelpers');
 
 const prisma = new PrismaClient();
 
@@ -161,8 +162,7 @@ async function getOne(req, res, next) {
         manager: { select: { id: true, name: true, email: true, phone: true } },
         units: {
           include: {
-            tenancy: {
-              where: { status: 'ACTIVE' },
+            tenancies: {
               include: { tenant: { select: { id: true, name: true, email: true, phone: true } } },
             },
           },
@@ -176,7 +176,11 @@ async function getOne(req, res, next) {
 
     const revenueByProperty = await getMonthlyRevenueByProperty([property.id]);
 
-    return ApiResponse.success(res, parseAmenities({ ...property, monthlyRevenue: revenueByProperty[property.id] || 0 }));
+    return ApiResponse.success(res, parseAmenities({
+      ...property,
+      units: property.units.map(attachCurrentTenancy),
+      monthlyRevenue: revenueByProperty[property.id] || 0,
+    }));
   } catch (err) {
     next(err);
   }
@@ -242,15 +246,14 @@ async function getUnits(req, res, next) {
     const units = await prisma.unit.findMany({
       where: { propertyId: req.params.id },
       include: {
-        tenancy: {
-          where: { status: 'ACTIVE' },
+        tenancies: {
           include: { tenant: { select: { id: true, name: true, email: true, phone: true } } },
         },
       },
       orderBy: { unitNumber: 'asc' },
     });
 
-    return ApiResponse.success(res, units);
+    return ApiResponse.success(res, units.map(attachCurrentTenancy));
   } catch (err) {
     next(err);
   }

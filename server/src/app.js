@@ -125,6 +125,13 @@ async function start() {
     await prisma.$connect();
     logger.info('Database connected');
 
+    // Backfill any chart-of-accounts entries added since an org registered
+    // (e.g. a new expense category) — upsert is a no-op where the account
+    // already exists, so this is cheap and safe to run on every boot.
+    const { seedDefaultChartOfAccounts } = require('./utils/defaultChartOfAccounts');
+    const organizations = await prisma.organization.findMany({ select: { id: true } });
+    await Promise.all(organizations.map((org) => seedDefaultChartOfAccounts(prisma, org.id)));
+
     // Initialize scheduled jobs
     if (process.env.NODE_ENV !== 'test') {
       const { initializeJobs } = require('./jobs/invoiceJob');

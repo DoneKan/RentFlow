@@ -16,6 +16,7 @@ const STATUS_TABS = ['All', 'Draft', 'Sent', 'Paid', 'Overdue']
 export default function InvoicesPage() {
   const navigate = useNavigate()
   const [showGenerate, setShowGenerate] = useState(false)
+  const [editInvoice, setEditInvoice] = useState(null)
   const [statusFilter, setStatusFilter] = useState('All')
 
   const statusParam = statusFilter === 'All' ? undefined : statusFilter.toUpperCase()
@@ -54,6 +55,7 @@ export default function InvoicesPage() {
       key: 'id', label: 'Actions',
       render: (id, row) => (
         <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+          {row.status === 'DRAFT' && <button onClick={(e) => { e.stopPropagation(); setEditInvoice(row) }} className="text-xs text-gray-500 hover:underline">Edit</button>}
           {row.status === 'DRAFT' && <button onClick={(e) => handleSend(id, e)} className="text-xs text-brand hover:underline">Send</button>}
           {(row.status === 'SENT' || row.status === 'OVERDUE') && <button onClick={(e) => handleRemind(id, e)} className="text-xs text-orange-500 hover:underline">Remind</button>}
           {!['CANCELLED', 'PAID'].includes(row.status) && <button onClick={(e) => handleCancel(id, e)} className="text-xs text-red-400 hover:underline">Cancel</button>}
@@ -88,6 +90,9 @@ export default function InvoicesPage() {
       )}
       <Modal isOpen={showGenerate} onClose={() => setShowGenerate(false)} title="Generate Invoice" size="lg">
         <GenerateInvoiceForm onClose={() => setShowGenerate(false)} />
+      </Modal>
+      <Modal isOpen={!!editInvoice} onClose={() => setEditInvoice(null)} title="Edit Draft Invoice" size="lg">
+        {editInvoice && <GenerateInvoiceForm invoice={editInvoice} onClose={() => setEditInvoice(null)} />}
       </Modal>
     </div>
   )

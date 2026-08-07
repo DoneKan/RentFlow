@@ -1,20 +1,22 @@
 const { PrismaClient } = require('@prisma/client');
 const ApiError = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
+const { attachCurrentTenancy } = require('../utils/tenancyHelpers');
 
 const prisma = new PrismaClient();
 
 function parseUnit(unit) {
   if (!unit) return unit;
+  const withTenancy = attachCurrentTenancy(unit);
   try {
     return {
-      ...unit,
+      ...withTenancy,
       additionalCharges: typeof unit.additionalCharges === 'string'
         ? JSON.parse(unit.additionalCharges)
         : (unit.additionalCharges || {}),
     };
   } catch {
-    return { ...unit, additionalCharges: {} };
+    return { ...withTenancy, additionalCharges: {} };
   }
 }
 
@@ -30,8 +32,7 @@ async function list(req, res, next) {
       },
       include: {
         property: { select: { id: true, name: true, code: true, city: true } },
-        tenancy: {
-          where: { status: 'ACTIVE' },
+        tenancies: {
           include: { tenant: { select: { id: true, name: true, email: true, phone: true } } },
         },
       },
@@ -86,8 +87,7 @@ async function getOne(req, res, next) {
       },
       include: {
         property: true,
-        tenancy: {
-          where: { status: 'ACTIVE' },
+        tenancies: {
           include: { tenant: { select: { id: true, name: true, email: true, phone: true } } },
         },
       },

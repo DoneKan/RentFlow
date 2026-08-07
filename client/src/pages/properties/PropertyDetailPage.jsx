@@ -35,6 +35,7 @@ export default function PropertyDetailPage() {
   const [selectedUnitId, setSelectedUnitId] = useState(null)
   const [showAddExpense, setShowAddExpense] = useState(false)
   const [showDelete, setShowDelete] = useState(false)
+  const [historyUnit, setHistoryUnit] = useState(null)
 
   const deleteProperty = useDeleteProperty()
   const { data: property, isLoading } = useProperty(id)
@@ -67,7 +68,7 @@ export default function PropertyDetailPage() {
       key: 'id',
       label: 'Actions',
       render: (unitId, row) => (
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
           {row.status === 'VACANT' ? (
             <button
               onClick={(e) => { e.stopPropagation(); setSelectedUnitId(unitId); setShowAddTenant(true) }}
@@ -81,6 +82,14 @@ export default function PropertyDetailPage() {
               className="text-xs text-brand hover:underline"
             >
               View Tenant
+            </button>
+          )}
+          {row.tenancyHistory?.length > 0 && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setHistoryUnit(row) }}
+              className="text-xs text-gray-400 hover:underline"
+            >
+              History ({row.tenancyHistory.length})
             </button>
           )}
         </div>
@@ -236,6 +245,22 @@ export default function PropertyDetailPage() {
 
       <Modal isOpen={showAddExpense} onClose={() => setShowAddExpense(false)} title="Log Expense" size="md">
         <LogExpenseForm defaultPropertyId={id} onClose={() => setShowAddExpense(false)} />
+      </Modal>
+
+      <Modal isOpen={!!historyUnit} onClose={() => setHistoryUnit(null)} title={`Unit #${historyUnit?.unitNumber} — Occupancy History`} size="md">
+        <div className="space-y-3">
+          {historyUnit?.tenancyHistory?.map((t) => (
+            <div key={t.id} className="flex items-center justify-between border-b border-gray-100 pb-2 last:border-0">
+              <div>
+                <p className="text-sm font-medium text-gray-900">{t.tenant?.name}</p>
+                <p className="text-xs text-gray-500">
+                  {formatDate(t.startDate)} — {t.endDate ? formatDate(t.endDate) : 'present'}
+                </p>
+              </div>
+              <span className="text-sm text-gray-600">{formatCurrency(t.rentAmount)}</span>
+            </div>
+          ))}
+        </div>
       </Modal>
 
       <ConfirmDialog
