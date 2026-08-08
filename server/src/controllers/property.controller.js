@@ -2,6 +2,7 @@ const ApiError = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
 const { generatePropertyCode } = require('../utils/generateCode');
 const { attachCurrentTenancy } = require('../utils/tenancyHelpers');
+const { getCompletedPaymentTotalsByProperty } = require('../utils/paymentAggregates');
 
 const prisma = require('../utils/prisma');
 
@@ -15,29 +16,14 @@ function parseAmenities(p) {
   }
 }
 
-// Sums this calendar month's completed payments per property. Payment has no
-// direct propertyId column (it hangs off invoice), so this can't be a
-// Prisma groupBy — fetch the raw rows and reduce in JS instead.
+// Sums this calendar month's completed payments per property, aggregated
+// at the database level (see paymentAggregates.js for why this needs a
+// join rather than a plain Prisma groupBy).
 async function getMonthlyRevenueByProperty(propertyIds) {
-  if (propertyIds.length === 0) return {};
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
-
-  const payments = await prisma.payment.findMany({
-    where: {
-      invoice: { propertyId: { in: propertyIds } },
-      status: 'COMPLETED',
-      paidAt: { gte: monthStart, lte: monthEnd },
-    },
-    select: { amount: true, invoice: { select: { propertyId: true } } },
-  });
-
-  return payments.reduce((acc, pay) => {
-    const pid = pay.invoice.propertyId;
-    acc[pid] = (acc[pid] || 0) + Number(pay.amount);
-    return acc;
-  }, {});
+  return getCompletedPaymentTotalsByProperty(prisma, propertyIds, monthStart, monthEnd);
 }
 
 async function list(req, res, next) {

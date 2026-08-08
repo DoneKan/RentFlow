@@ -535,5 +535,6 @@ model JournalLine {
 
   @@index([journalEntryId])
   @@index([accountId])
+  @@index([propertyId])
   @@map("journal_lines")
 }

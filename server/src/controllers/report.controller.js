@@ -2,6 +2,7 @@ const ApiError = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
 const { syncOverdueStatuses } = require('../jobs/invoiceJob');
 const { attachCurrentTenancy } = require('../utils/tenancyHelpers');
+const { getCompletedPaymentTotalsByProperty } = require('../utils/paymentAggregates');
 
 const prisma = require('../utils/prisma');
 
@@ -29,10 +30,6 @@ function resolveRange(query) {
   const m = parseInt(month) || new Date().getMonth() + 1;
   const y = parseInt(year) || new Date().getFullYear();
   return { start: startOfMonth(y, m), end: endOfMonth(y, m) };
-}
-
-function monthKey(date) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
 }
 
 async function dashboard(req, res, next) {
@@ -193,47 +190,40 @@ async function computeOverview(orgId, start, end, propertyId) {
 
   // Trend window is always the trailing 6 months ending in the selected
   // range's end month, independent of how wide the selected range itself is.
+  // One SUM per month per metric (12 small aggregate queries) instead of
+  // pulling every payment/expense row in the whole 6-month window and
+  // summing them in JS — Prisma's groupBy can't bucket by a computed
+  // month expression portably across Postgres/SQLite, but a fixed 6-month
+  // window is small enough that 6 aggregate() calls per metric is cheap
+  // and keeps the SUM at the database level.
   const trendStartMonth = new Date(end.getFullYear(), end.getMonth() - 5, 1);
-  const trendEnd = endOfMonth(end.getFullYear(), end.getMonth() + 1);
+  const trendMonths = Array.from({ length: 6 }, (_, i) => new Date(trendStartMonth.getFullYear(), trendStartMonth.getMonth() + i, 1));
 
-  const [trendPayments, trendExpenses] = await Promise.all([
-    prisma.payment.findMany({
-      where: {
-        invoice: { property: { organizationId: orgId }, ...propertyFilter },
-        status: 'COMPLETED',
-        paidAt: { gte: trendStartMonth, lte: trendEnd },
-      },
-      select: { amount: true, paidAt: true },
-    }),
-    prisma.expense.findMany({
-      where: { property: { organizationId: orgId }, date: { gte: trendStartMonth, lte: trendEnd }, ...propertyFilter },
-      select: { amount: true, date: true },
-    }),
-  ]);
-
-  const revMap = {};
-  trendPayments.forEach((p) => {
-    const key = monthKey(p.paidAt);
-    revMap[key] = (revMap[key] || 0) + Number(p.amount);
-  });
-  const expMap = {};
-  trendExpenses.forEach((e) => {
-    const key = monthKey(e.date);
-    expMap[key] = (expMap[key] || 0) + Number(e.amount);
-  });
-
-  const trend = Array.from({ length: 6 }, (_, i) => {
-    const d = new Date(trendStartMonth.getFullYear(), trendStartMonth.getMonth() + i, 1);
-    const key = monthKey(d);
-    const rev = revMap[key] || 0;
-    const exp = expMap[key] || 0;
+  const trend = await Promise.all(trendMonths.map(async (monthStartDate) => {
+    const monthEndDate = endOfMonth(monthStartDate.getFullYear(), monthStartDate.getMonth() + 1);
+    const [revAgg, expAgg] = await Promise.all([
+      prisma.payment.aggregate({
+        where: {
+          invoice: { property: { organizationId: orgId }, ...propertyFilter },
+          status: 'COMPLETED',
+          paidAt: { gte: monthStartDate, lte: monthEndDate },
+        },
+        _sum: { amount: true },
+      }),
+      prisma.expense.aggregate({
+        where: { property: { organizationId: orgId }, date: { gte: monthStartDate, lte: monthEndDate }, ...propertyFilter },
+        _sum: { amount: true },
+      }),
+    ]);
+    const rev = Number(revAgg._sum.amount || 0);
+    const exp = Number(expAgg._sum.amount || 0);
     return {
-      month: d.toLocaleString('en-US', { month: 'short', year: 'numeric' }),
+      month: monthStartDate.toLocaleString('en-US', { month: 'short', year: 'numeric' }),
       revenue: rev,
       expenses: exp,
       netIncome: rev - exp,
     };
-  });
+  }));
 
   return {
     range: { startDate: start, endDate: end },
@@ -254,30 +244,34 @@ async function computeOverview(orgId, start, end, propertyId) {
 
 // Core data for the "By Property" report: revenue/expenses/occupancy per
 // property so a landlord can see which buildings are actually profitable.
+// Every per-property figure is computed with SUM/COUNT at the database
+// level (groupBy, or a join for revenue — see paymentAggregates.js) —
+// this used to pull every property's invoices/payments/expenses into the
+// app via nested includes and reduce() them in JS, which meant the
+// response time scaled with total transaction volume across the whole
+// portfolio instead of with the (small, fixed) number of properties.
 async function computeByProperty(orgId, start, end) {
-  const [properties, outstandingByProperty] = await Promise.all([
-    prisma.property.findMany({
-      where: { organizationId: orgId, isActive: true },
-      include: {
-        units: { select: { status: true } },
-        invoices: {
-          where: { dueDate: { gte: start, lte: end } },
-          select: {
-            amount: true,
-            status: true,
-            payments: {
-              where: { status: 'COMPLETED', paidAt: { gte: start, lte: end } },
-              select: { amount: true },
-            },
-          },
-        },
-        expenses: {
-          where: { date: { gte: start, lte: end } },
-          select: { amount: true, category: true },
-        },
+  const properties = await prisma.property.findMany({
+    where: { organizationId: orgId, isActive: true },
+    include: { units: { select: { status: true } } },
+    orderBy: { name: 'asc' },
+  });
+
+  if (properties.length === 0) {
+    return {
+      range: { startDate: start, endDate: end },
+      properties: [],
+      totals: {
+        revenue: 0, expenses: 0, outstanding: 0, netIncome: 0,
+        totalUnits: 0, occupiedUnits: 0, invoicesRaised: 0,
+        occupancyRate: 0, margin: 0,
       },
-      orderBy: { name: 'asc' },
-    }),
+    };
+  }
+
+  const propertyIds = properties.map((p) => p.id);
+
+  const [outstandingByProperty, invoicedByProperty, revenueByProperty, expensesByPropertyAndCategory] = await Promise.all([
     // Cumulative-to-date unpaid balance per property, matching
     // computeOverview's outstanding definition — not scoped to invoices
     // raised within the selected window, so it doesn't miss earlier
@@ -291,28 +285,41 @@ async function computeByProperty(orgId, start, end) {
       },
       _sum: { amount: true },
     }),
+    prisma.invoice.groupBy({
+      by: ['propertyId'],
+      where: { propertyId: { in: propertyIds }, dueDate: { gte: start, lte: end } },
+      _count: true,
+    }),
+    getCompletedPaymentTotalsByProperty(prisma, propertyIds, start, end),
+    prisma.expense.groupBy({
+      by: ['propertyId', 'category'],
+      where: { propertyId: { in: propertyIds }, date: { gte: start, lte: end } },
+      _sum: { amount: true },
+    }),
   ]);
 
-  const outstandingMap = Object.fromEntries(
-    outstandingByProperty.map((r) => [r.propertyId, Number(r._sum.amount || 0)])
-  );
+  const outstandingMap = Object.fromEntries(outstandingByProperty.map((r) => [r.propertyId, Number(r._sum.amount || 0)]));
+  const invoicedCountMap = Object.fromEntries(invoicedByProperty.map((r) => [r.propertyId, r._count]));
+
+  // expensesByPropertyAndCategory is one row per (property, category) pair
+  // — a handful of rows per property, not one per expense — cheap to fold
+  // into a per-property map in JS.
+  const expensesByProperty = {};
+  for (const row of expensesByPropertyAndCategory) {
+    const bucket = expensesByProperty[row.propertyId] || (expensesByProperty[row.propertyId] = { byCategory: {}, total: 0 });
+    const amount = Number(row._sum.amount || 0);
+    bucket.byCategory[row.category] = amount;
+    bucket.total += amount;
+  }
 
   const rows = properties
     .map((prop) => {
       const totalUnits = prop.units.length;
       const occupied = prop.units.filter((u) => u.status === 'OCCUPIED').length;
 
-      const revenue = prop.invoices.reduce(
-        (sum, inv) => sum + inv.payments.reduce((s, p) => s + Number(p.amount), 0),
-        0
-      );
+      const revenue = revenueByProperty[prop.id] || 0;
       const outstanding = outstandingMap[prop.id] || 0;
-
-      const expensesByCategory = {};
-      prop.expenses.forEach((e) => {
-        expensesByCategory[e.category] = (expensesByCategory[e.category] || 0) + Number(e.amount);
-      });
-      const expensesTotal = prop.expenses.reduce((s, e) => s + Number(e.amount), 0);
+      const { byCategory: expensesByCategory, total: expensesTotal } = expensesByProperty[prop.id] || { byCategory: {}, total: 0 };
       const topCategoryEntry = Object.entries(expensesByCategory).sort((a, b) => b[1] - a[1])[0];
 
       const netIncome = revenue - expensesTotal;
@@ -324,7 +331,7 @@ async function computeByProperty(orgId, start, end) {
         totalUnits,
         occupiedUnits: occupied,
         occupancyRate: totalUnits > 0 ? Math.round((occupied / totalUnits) * 100) : 0,
-        invoicesRaised: prop.invoices.length,
+        invoicesRaised: invoicedCountMap[prop.id] || 0,
         revenue,
         expenses: expensesTotal,
         expensesByCategory,
