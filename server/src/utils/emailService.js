@@ -75,6 +75,23 @@ async function sendWelcomeEmail(user) {
   return sendEmail({ to: user.email, subject: 'Welcome to RentFlow!', html });
 }
 
+async function sendPasswordResetEmail(user, resetUrl) {
+  const html = `
+    <style>${baseStyles}</style>
+    <div class="container">
+      <div class="header"><h1>RentFlow</h1><p>Property Management System</p></div>
+      <div class="body">
+        <h2>Reset your password</h2>
+        <p>Hi ${user.name}, we received a request to reset the password on your RentFlow account. This link is valid for 1 hour and can only be used once.</p>
+        <a href="${resetUrl}" class="btn">Reset Password</a>
+        <p style="color:#6b7280;font-size:12px;">If you didn't request this, you can safely ignore this email — your password won't be changed.</p>
+      </div>
+      <div class="footer"><p>RentFlow — Built for Uganda. Ready for East Africa.</p><p>© ${new Date().getFullYear()} RentFlow</p></div>
+    </div>`;
+
+  return sendEmail({ to: user.email, subject: 'Reset your RentFlow password', html });
+}
+
 async function sendInvoiceEmail(tenant, invoice, unit, property, pdfBuffer) {
   const html = `
     <style>${baseStyles}</style>
@@ -198,6 +215,7 @@ async function sendDemandNotice(tenant, invoice, unit, property) {
 module.exports = {
   sendEmail,
   sendWelcomeEmail,
+  sendPasswordResetEmail,
   sendInvoiceEmail,
   sendPaymentReceipt,
   sendRentReminder,

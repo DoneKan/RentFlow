@@ -49,18 +49,37 @@ model User {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  organization        Organization?        @relation(fields: [organizationId], references: [id])
-  managedProperties   Property[]           @relation("PropertyManager")
-  ownedProperties     Property[]           @relation("PropertyOwner")
-  tenantProfile       Tenancy[]            @relation("TenantUser")
-  invoices            Invoice[]            @relation("TenantInvoices")
-  payments            Payment[]            @relation("TenantPayments")
-  notifications       Notification[]
-  maintenanceRequests MaintenanceRequest[] @relation("TenantMaintenance")
+  organization         Organization?         @relation(fields: [organizationId], references: [id])
+  managedProperties    Property[]            @relation("PropertyManager")
+  ownedProperties      Property[]            @relation("PropertyOwner")
+  tenantProfile        Tenancy[]             @relation("TenantUser")
+  invoices             Invoice[]             @relation("TenantInvoices")
+  payments             Payment[]             @relation("TenantPayments")
+  notifications        Notification[]
+  maintenanceRequests  MaintenanceRequest[]  @relation("TenantMaintenance")
+  passwordResetTokens  PasswordResetToken[]
 
   @@index([email])
   @@index([organizationId])
   @@map("users")
+}
+
+// The raw reset token is only ever emailed to the user — this table stores
+// a SHA-256 hash of it, never the token itself, same principle as never
+// storing a plaintext password. usedAt makes a token single-use; expiresAt
+// makes it time-limited.
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@map("password_reset_tokens")
 }
 
 model Property {
