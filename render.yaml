@@ -1,0 +1,76 @@
+services:
+  - type: web
+    name: rentflow-backend
+    runtime: node
+    plan: free
+    region: ohio
+    branch: main
+    rootDir: server
+    buildCommand: npm ci && npx prisma generate
+    startCommand: npx prisma migrate deploy && node src/app.js
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: APP_URL
+        value: https://rentflow-backend.onrender.com
+      # Comma-separated list of allowed frontend origins (server/src/app.js CORS config)
+      - key: CLIENT_URL
+        value: https://rent-flow-chi.vercel.app
+      - key: DATABASE_CONNECTION_LIMIT
+        value: "5"
+
+      # ── Secrets — set these manually in the Render dashboard, never commit real values ──
+      # Neon pooled connection string (PgBouncer endpoint, "-pooler" host), used by
+      # the running app. Append ?pgbouncer=true so Prisma disables prepared-statement
+      # caching, which PgBouncer's transaction pooling mode doesn't support.
+      - key: DATABASE_URL
+        sync: false
+      # Neon direct (non-pooled) connection string — used only by `prisma migrate
+      # deploy` at startup. Schema/DDL changes and Prisma's migration advisory lock
+      # don't work reliably through a transaction-mode pooler.
+      - key: DIRECT_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      - key: MTN_API_URL
+        sync: false
+      - key: MTN_SUBSCRIPTION_KEY
+        sync: false
+      - key: MTN_API_USER
+        sync: false
+      - key: MTN_API_KEY
+        sync: false
+      - key: MTN_ENVIRONMENT
+        sync: false
+      - key: AIRTEL_API_URL
+        sync: false
+      - key: AIRTEL_CLIENT_ID
+        sync: false
+      - key: AIRTEL_CLIENT_SECRET
+        sync: false
+      - key: AIRTEL_ENVIRONMENT
+        sync: false
+      - key: MTN_WEBHOOK_SECRET
+        sync: false
+      - key: AIRTEL_WEBHOOK_SECRET
+        sync: false
+      - key: AT_API_KEY
+        sync: false
+      - key: AT_USERNAME
+        sync: false
+      - key: AT_SENDER_ID
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: SMTP_FROM
+        sync: false
