@@ -31,6 +31,9 @@ function errorHandler(err, req, res, next) {
   } else if (err.name === 'ValidationError') {
     statusCode = 400;
     message = err.message;
+  } else if (err.name === 'MulterError') {
+    statusCode = 400;
+    message = err.code === 'LIMIT_FILE_SIZE' ? 'File is too large' : err.message;
   }
 
   if (statusCode >= 500) {

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Search, Building2, MapPin, Users, TrendingUp } from 'lucide-react'
+import { Plus, Search, Building2, MapPin, Users, TrendingUp, Upload } from 'lucide-react'
 import { useProperties } from '../../hooks/useProperties'
 import { formatCurrency } from '../../utils/formatters'
 import { PROPERTY_TYPES } from '../../utils/constants'
@@ -94,6 +94,10 @@ export default function PropertiesPage() {
         title="Properties"
         subtitle={`${properties.length} propert${properties.length !== 1 ? 'ies' : 'y'}`}
         actions={[
+          <button key="import" onClick={() => navigate('/properties/import')} className="btn-secondary flex items-center gap-2">
+            <Upload className="h-4 w-4" />
+            Import
+          </button>,
           <button key="add" onClick={() => setShowAdd(true)} className="btn-primary flex items-center gap-2">
             <Plus className="h-4 w-4" />
             Add Property

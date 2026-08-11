@@ -31,6 +31,7 @@ const inspectionRoutes = require('./routes/inspection.routes');
 const budgetRoutes = require('./routes/budget.routes');
 const accountRoutes = require('./routes/account.routes');
 const ledgerRoutes = require('./routes/ledger.routes');
+const importRoutes = require('./routes/import.routes');
 
 const app = express();
 
@@ -113,6 +114,7 @@ app.use(`${API}/inspections`, inspectionRoutes);
 app.use(`${API}/budgets`, budgetRoutes);
 app.use(`${API}/accounts`, accountRoutes);
 app.use(`${API}/ledger`, ledgerRoutes);
+app.use(`${API}/imports`, importRoutes);
 
 // 404 handler
 app.use((req, res, next) => {

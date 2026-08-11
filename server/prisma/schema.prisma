@@ -34,6 +34,7 @@ model Organization {
   budgets        Budget[]
   accounts       Account[]
   journalEntries JournalEntry[]
+  importBatches  ImportBatch[]
 
   @@map("organizations")
 }
@@ -59,6 +60,7 @@ model User {
   notifications        Notification[]
   maintenanceRequests  MaintenanceRequest[]  @relation("TenantMaintenance")
   passwordResetTokens  PasswordResetToken[]
+  importBatches        ImportBatch[]
 
   @@index([email])
   @@index([organizationId])
@@ -538,4 +540,61 @@ model JournalLine {
   @@index([accountId])
   @@index([propertyId])
   @@map("journal_lines")
+}
+
+// A single upload's dry-run + commit lifecycle. entityType is a plain string
+// ("PROPERTY", "UNIT", "TENANCY", "INVOICE", "EXPENSE") rather than a Prisma
+// enum, matching how the rest of this schema treats status/category fields —
+// see DEVELOPMENT.md. A batch moves PENDING -> COMMITTED (rows written,
+// one-way — confirming twice is rejected) or PENDING -> FAILED (transaction
+// rolled back, nothing written). Rows and their per-row validation outcome
+// are kept (ImportBatchRow) so re-confirming or downloading the error report
+// doesn't require re-parsing/re-validating the original file.
+model ImportBatch {
+  id             String    @id @default(cuid())
+  organizationId String
+  entityType     String
+  fileName       String
+  status         String    @default("PENDING")
+  totalRows      Int
+  cleanCount     Int
+  warningCount   Int
+  errorCount     Int
+  importedCount  Int       @default(0)
+  failureReason  String?
+  createdById    String
+  createdAt      DateTime  @default(now())
+  committedAt    DateTime?
+
+  organization Organization     @relation(fields: [organizationId], references: [id])
+  createdBy    User             @relation(fields: [createdById], references: [id])
+  rows         ImportBatchRow[]
+
+  @@index([organizationId])
+  @@index([status])
+  @@map("import_batches")
+}
+
+model ImportBatchRow {
+  id        String  @id @default(cuid())
+  batchId   String
+  rowNumber Int
+  // JSON-stringified normalized field values for this row (SQLite/Postgres
+  // portability — same reasoning as Property.amenities elsewhere in this file).
+  data      String
+  bucket    String
+  // JSON-stringified array of plain-language reason strings.
+  reasons   String  @default("[]")
+  // Only meaningful for bucket=WARNING: whether the user opted to import this
+  // row despite the warning. Defaults false so a re-uploaded file that now
+  // collides with already-imported data does NOT get re-imported unless the
+  // user explicitly overrides it.
+  included  Boolean @default(false)
+  imported  Boolean @default(false)
+
+  batch ImportBatch @relation(fields: [batchId], references: [id])
+
+  @@index([batchId])
+  @@index([batchId, bucket])
+  @@map("import_batch_rows")
 }
