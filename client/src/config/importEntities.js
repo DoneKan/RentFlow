@@ -35,7 +35,14 @@ export const IMPORT_ENTITIES = {
     description: 'Bulk-create tenants and assign them to units.',
     backPath: '/tenants',
     backLabel: 'Tenants',
-    available: false,
+    available: true,
+    previewColumns: [
+      { key: 'propertyName', label: 'Property' },
+      { key: 'unitNumber', label: 'Unit #' },
+      { key: 'tenantName', label: 'Tenant' },
+      { key: 'tenantEmail', label: 'Email' },
+      { key: 'startDate', label: 'Start Date' },
+    ],
   },
   invoices: {
     label: 'Invoices',

@@ -1,5 +1,6 @@
 const ApiError = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
+const logger = require('../utils/logger');
 const prisma = require('../utils/prisma');
 const { getImporter } = require('../services/import/registry');
 const { toCsv, parseImportCsv } = require('../services/import/csvUtils');
@@ -86,14 +87,16 @@ async function validateUpload(req, res, next) {
       : {};
 
     const validated = parsed.rows.map((row) => {
-      const { normalized, errors } = importer.validateRow(row.fields, context);
+      const { normalized, errors } = importer.validateRow(row.fields, context, row.rowNumber);
       return { rowNumber: row.rowNumber, fields: row.fields, normalized, errors };
     });
 
     const errorRows = validated.filter((r) => r.errors.length > 0);
     const candidateRows = validated.filter((r) => r.errors.length === 0);
 
-    const dupWarnings = await importer.findDuplicateWarnings(prisma, req.user.organizationId, candidateRows);
+    const dupWarnings = importer.findDuplicateWarnings
+      ? await importer.findDuplicateWarnings(prisma, req.user.organizationId, candidateRows)
+      : new Map();
 
     const warningRows = candidateRows.filter((r) => dupWarnings.has(r.rowNumber));
     const cleanRows = candidateRows.filter((r) => !dupWarnings.has(r.rowNumber));
@@ -212,11 +215,12 @@ async function confirmImport(req, res, next) {
     let culpritRowNumber = null;
     try {
       const importedIds = [];
+      const commitResults = [];
       await prisma.$transaction(async (tx) => {
         for (const row of rowsToImport) {
           culpritRowNumber = row.rowNumber;
           const { normalized } = parseRowData(row);
-          await importer.commitRow(tx, req.user.organizationId, req.user.id, normalized);
+          commitResults.push(await importer.commitRow(tx, req.user.organizationId, req.user.id, normalized));
           importedIds.push(row.id);
         }
         await tx.importBatchRow.updateMany({
@@ -227,7 +231,17 @@ async function confirmImport(req, res, next) {
           where: { id: batch.id },
           data: { status: 'COMMITTED', committedAt: new Date(), importedCount: importedIds.length },
         });
-      });
+      }, { timeout: 120000 }); // Prisma's 5s default is too short once a batch has more than a
+      // handful of rows, each doing multiple sequential writes (e.g. Tenancies
+      // creating a user + tenancy + unit update per row) over real network
+      // latency to the DB — this was hit and confirmed during testing.
+
+      // Side effects that shouldn't hold the transaction open (e.g. sending
+      // welcome emails for newly-created tenant accounts) run only after
+      // the commit is durable, and never block or fail the response.
+      if (importer.afterCommit) {
+        importer.afterCommit(commitResults).catch((e) => logger.error(`[import:${importer.key}] afterCommit failed:`, e));
+      }
     } catch (txErr) {
       const reason = txErr.code === 'P2002'
         ? `Row ${culpritRowNumber} conflicts with data that already exists (it may have been imported by someone else since you previewed this file).`
