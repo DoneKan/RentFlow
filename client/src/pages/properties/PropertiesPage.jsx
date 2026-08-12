@@ -94,7 +94,7 @@ export default function PropertiesPage() {
         title="Properties"
         subtitle={`${properties.length} propert${properties.length !== 1 ? 'ies' : 'y'}`}
         actions={[
-          <button key="import" onClick={() => navigate('/properties/import')} className="btn-secondary flex items-center gap-2">
+          <button key="import" onClick={() => navigate('/import/properties')} className="btn-secondary flex items-center gap-2">
             <Upload className="h-4 w-4" />
             Import
           </button>,

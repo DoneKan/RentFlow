@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useParams, Navigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import {
   Download, Upload, ArrowLeft, CheckCircle2, AlertTriangle, XCircle, FileSpreadsheet, Loader2,
@@ -7,10 +7,9 @@ import {
 import { useValidateImport, useConfirmImport } from '../../hooks/useImports'
 import { downloadImportTemplate, downloadImportErrorReport } from '../../services/import.service'
 import { downloadBlob } from '../../utils/download'
+import { IMPORT_ENTITIES } from '../../config/importEntities'
 import PageHeader from '../../components/ui/PageHeader'
 import DataTable from '../../components/ui/DataTable'
-
-const ENTITY_TYPE = 'properties'
 
 function SummaryStat({ label, value, tone }) {
   const toneClasses = {
@@ -27,20 +26,27 @@ function SummaryStat({ label, value, tone }) {
   )
 }
 
-export default function PropertiesImportPage() {
+export default function ImportEntityPage() {
+  const { entityType } = useParams()
   const navigate = useNavigate()
   const fileInputRef = useRef(null)
 
+  const config = IMPORT_ENTITIES[entityType]
+
   const [file, setFile] = useState(null)
-  const [validation, setValidation] = useState(null) // { batchId, ignoredColumns, summary, preview, message? }
+  const [validation, setValidation] = useState(null)
   const [includedWarningIds, setIncludedWarningIds] = useState(new Set())
-  const [confirmResult, setConfirmResult] = useState(null) // { importedCount, skippedCount }
-  const [confirmFailure, setConfirmFailure] = useState(null) // error message string
+  const [confirmResult, setConfirmResult] = useState(null)
+  const [confirmFailure, setConfirmFailure] = useState(null)
   const [templateDownloading, setTemplateDownloading] = useState(false)
   const [reportDownloading, setReportDownloading] = useState(false)
 
-  const validateMutation = useValidateImport(ENTITY_TYPE)
-  const confirmMutation = useConfirmImport(ENTITY_TYPE)
+  const validateMutation = useValidateImport(entityType)
+  const confirmMutation = useConfirmImport(entityType)
+
+  if (!config || !config.available) {
+    return <Navigate to="/import" replace />
+  }
 
   const resetAll = () => {
     setFile(null)
@@ -54,8 +60,8 @@ export default function PropertiesImportPage() {
   const handleDownloadTemplate = async () => {
     setTemplateDownloading(true)
     try {
-      const blob = await downloadImportTemplate(ENTITY_TYPE)
-      downloadBlob(blob, 'rentflow-properties-template.csv')
+      const blob = await downloadImportTemplate(entityType)
+      downloadBlob(blob, `rentflow-${entityType}-template.csv`)
     } catch {
       toast.error('Could not download the template')
     } finally {
@@ -107,8 +113,8 @@ export default function PropertiesImportPage() {
     if (!validation) return
     setReportDownloading(true)
     try {
-      const blob = await downloadImportErrorReport(ENTITY_TYPE, validation.batchId)
-      downloadBlob(blob, 'rentflow-properties-import-errors.csv')
+      const blob = await downloadImportErrorReport(entityType, validation.batchId)
+      downloadBlob(blob, `rentflow-${entityType}-import-errors.csv`)
     } catch {
       toast.error('Could not download the error report')
     } finally {
@@ -118,10 +124,11 @@ export default function PropertiesImportPage() {
 
   const rowColumns = (withReason, withCheckbox) => [
     { key: 'rowNumber', label: 'Row' },
-    { key: 'name', label: 'Name', render: (_, row) => row.data.name || <span className="text-gray-300">—</span> },
-    { key: 'type', label: 'Type', render: (_, row) => row.data.type || '—' },
-    { key: 'city', label: 'City', render: (_, row) => row.data.city || '—' },
-    { key: 'address', label: 'Address', render: (_, row) => row.data.address || '—' },
+    ...config.previewColumns.map((c) => ({
+      key: c.key,
+      label: c.label,
+      render: (_, row) => row.data[c.key] || <span className="text-gray-300">—</span>,
+    })),
     ...(withReason
       ? [{ key: 'reasons', label: 'Reason', render: (_, row) => (
         <span className="text-sm">{row.reasons.join(' ')}</span>
@@ -145,12 +152,12 @@ export default function PropertiesImportPage() {
   return (
     <div>
       <PageHeader
-        title="Import Properties"
-        subtitle="Upload a CSV to bulk-create properties"
+        title={`Import ${config.label}`}
+        subtitle="Upload a CSV to bulk-create records"
         actions={[
-          <button key="back" onClick={() => navigate('/properties')} className="btn-secondary flex items-center gap-2">
+          <button key="back" onClick={() => navigate('/import')} className="btn-secondary flex items-center gap-2">
             <ArrowLeft className="h-4 w-4" />
-            Back to Properties
+            All Imports
           </button>,
         ]}
       />
@@ -164,7 +171,7 @@ export default function PropertiesImportPage() {
             <div>
               <h3 className="font-semibold text-gray-900">1. Get the template</h3>
               <p className="text-sm text-gray-500 mt-0.5">
-                Download the CSV template, fill in your properties, and keep the column headers unchanged.
+                Download the CSV template, fill it in, and keep the column headers unchanged.
               </p>
             </div>
           </div>
@@ -292,7 +299,7 @@ export default function PropertiesImportPage() {
             <>
               <CheckCircle2 className="h-12 w-12 text-emerald-600 mx-auto mb-4" />
               <h3 className="text-lg font-semibold text-gray-900">
-                {confirmResult.importedCount} propert{confirmResult.importedCount !== 1 ? 'ies' : 'y'} imported
+                {confirmResult.importedCount} record{confirmResult.importedCount !== 1 ? 's' : ''} imported
               </h3>
               {confirmResult.skippedCount > 0 && (
                 <p className="text-sm text-gray-500 mt-1">
@@ -317,7 +324,7 @@ export default function PropertiesImportPage() {
               Download Report
             </button>
             <button onClick={resetAll} className="btn-secondary">Import Another File</button>
-            <button onClick={() => navigate('/properties')} className="btn-primary">Go to Properties</button>
+            <button onClick={() => navigate(config.backPath)} className="btn-primary">Go to {config.backLabel}</button>
           </div>
         </div>
       )}

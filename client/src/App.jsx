@@ -10,7 +10,8 @@ import ResetPasswordPage from './pages/auth/ResetPasswordPage'
 import DashboardPage from './pages/dashboard/DashboardPage'
 import PropertiesPage from './pages/properties/PropertiesPage'
 import PropertyDetailPage from './pages/properties/PropertyDetailPage'
-import PropertiesImportPage from './pages/imports/PropertiesImportPage'
+import ImportHubPage from './pages/imports/ImportHubPage'
+import ImportEntityPage from './pages/imports/ImportEntityPage'
 import TenantsPage from './pages/tenants/TenantsPage'
 import TenantDetailPage from './pages/tenants/TenantDetailPage'
 import InvoicesPage from './pages/invoices/InvoicesPage'
@@ -82,8 +83,9 @@ export default function App() {
           {/* Manager / Admin routes */}
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/properties" element={<PropertiesPage />} />
-          <Route path="/properties/import" element={<PropertiesImportPage />} />
           <Route path="/properties/:id" element={<PropertyDetailPage />} />
+          <Route path="/import" element={<ImportHubPage />} />
+          <Route path="/import/:entityType" element={<ImportEntityPage />} />
           <Route path="/tenants" element={<TenantsPage />} />
           <Route path="/tenants/:id" element={<TenantDetailPage />} />
           <Route path="/invoices" element={<InvoicesPage />} />

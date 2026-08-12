@@ -77,8 +77,16 @@ async function validateUpload(req, res, next) {
       }, 'File parsed');
     }
 
+    // Entities with a foreign-key lookup column (e.g. Units resolving a
+    // "Property Name" to a propertyId) fetch the lookup table once here,
+    // rather than importer.validateRow querying the DB per row — a single
+    // query regardless of file size, up to the 5,000-row limit.
+    const context = importer.prefetchContext
+      ? await importer.prefetchContext(prisma, req.user.organizationId)
+      : {};
+
     const validated = parsed.rows.map((row) => {
-      const { normalized, errors } = importer.validateRow(row.fields);
+      const { normalized, errors } = importer.validateRow(row.fields, context);
       return { rowNumber: row.rowNumber, fields: row.fields, normalized, errors };
     });
 

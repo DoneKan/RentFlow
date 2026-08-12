@@ -23,6 +23,7 @@ import {
   Wallet,
   Landmark,
   BookOpen,
+  Upload,
 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { getInitials } from '../../utils/formatters'
@@ -44,6 +45,7 @@ const MANAGER_NAV = [
   { to: '/accounting/chart-of-accounts', icon: Landmark, label: 'Chart of Accounts' },
   { to: '/accounting/ledger', icon: BookOpen, label: 'General Ledger' },
   { to: '/reports', icon: BarChart3, label: 'Reports' },
+  { to: '/import', icon: Upload, label: 'Data Import' },
   { to: '/settings', icon: Settings, label: 'Settings' },
 ]
 
