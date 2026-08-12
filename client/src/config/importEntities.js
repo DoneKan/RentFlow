@@ -62,7 +62,13 @@ export const IMPORT_ENTITIES = {
     description: 'Bulk-create property and unit expenses.',
     backPath: '/expenses',
     backLabel: 'Expenses',
-    available: false,
+    available: true,
+    previewColumns: [
+      { key: 'propertyName', label: 'Property' },
+      { key: 'category', label: 'Category' },
+      { key: 'amount', label: 'Amount' },
+      { key: 'date', label: 'Date' },
+    ],
   },
 }
 

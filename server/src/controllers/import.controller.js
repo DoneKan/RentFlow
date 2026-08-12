@@ -240,7 +240,7 @@ async function confirmImport(req, res, next) {
       // welcome emails for newly-created tenant accounts) run only after
       // the commit is durable, and never block or fail the response.
       if (importer.afterCommit) {
-        importer.afterCommit(commitResults).catch((e) => logger.error(`[import:${importer.key}] afterCommit failed:`, e));
+        importer.afterCommit(commitResults, req.user.organizationId).catch((e) => logger.error(`[import:${importer.key}] afterCommit failed:`, e));
       }
     } catch (txErr) {
       const reason = txErr.code === 'P2002'
