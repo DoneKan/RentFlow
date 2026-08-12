@@ -49,7 +49,13 @@ export const IMPORT_ENTITIES = {
     description: 'Bulk-create invoices for existing tenancies.',
     backPath: '/invoices',
     backLabel: 'Invoices',
-    available: false,
+    available: true,
+    previewColumns: [
+      { key: 'propertyName', label: 'Property' },
+      { key: 'unitNumber', label: 'Unit #' },
+      { key: 'dueDate', label: 'Due Date' },
+      { key: 'rentAmount', label: 'Rent' },
+    ],
   },
   expenses: {
     label: 'Expenses',
