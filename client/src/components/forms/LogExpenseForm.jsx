@@ -6,6 +6,7 @@ import { useCreateExpense, useUpdateExpense } from '../../hooks/useExpenses'
 import { usePropertyUnits } from '../../hooks/useProperties'
 import { getProperties } from '../../services/property.service'
 import { EXPENSE_CATEGORIES } from '../../utils/constants'
+import NumberInput from '../ui/NumberInput'
 
 export default function LogExpenseForm({ onClose, defaultPropertyId, expense, onSuccess }) {
   const isEditing = !!expense
@@ -104,7 +105,7 @@ export default function LogExpenseForm({ onClose, defaultPropertyId, expense, on
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="label">Amount *</label>
-          <input type="number" value={form.amount} onChange={(e) => set('amount', e.target.value)} className="input" placeholder="0" required />
+          <NumberInput value={form.amount} onChange={(v) => set('amount', v)} placeholder="0" required />
         </div>
         <div>
           <label className="label">Date *</label>

@@ -5,6 +5,7 @@ const { sendWelcomeEmail } = require('../utils/emailService');
 const logger = require('../utils/logger');
 
 const prisma = require('../utils/prisma');
+const { applyTenantDisplay, applyTenantDisplayAll } = require('../utils/tenancyHelpers');
 
 async function list(req, res, next) {
   try {
@@ -35,6 +36,8 @@ async function list(req, res, next) {
         },
       }),
     ]);
+
+    applyTenantDisplayAll(tenancies, null);
 
     return ApiResponse.paginated(res, tenancies, {
       total,
@@ -71,8 +74,14 @@ async function create(req, res, next) {
     if (!unit) throw ApiError.notFound('Unit not found');
     if (unit.status !== 'VACANT') throw ApiError.conflict('Unit is not vacant');
 
-    // Check if email already exists as a user
-    let tenantUser = await prisma.user.findUnique({ where: { email } });
+    // Email is optional now — normalize a blank string to null so it never
+    // collides with another email-less tenant under the @unique constraint
+    // (Postgres treats every NULL as distinct). Without an email there's no
+    // identity to look an existing account up by, so an email-less tenant
+    // always gets a brand-new User — only a shared, non-blank email can
+    // trigger the reuse-existing-account path below.
+    const normalizedEmail = email ? email.trim().toLowerCase() : null;
+    let tenantUser = normalizedEmail ? await prisma.user.findUnique({ where: { email: normalizedEmail } }) : null;
 
     await prisma.$transaction(async (tx) => {
       if (!tenantUser) {
@@ -81,14 +90,16 @@ async function create(req, res, next) {
         tenantUser = await tx.user.create({
           data: {
             name,
-            email,
+            email: normalizedEmail,
             password: hashed,
             phone,
             role: 'TENANT',
             organizationId: req.user.organizationId,
           },
         });
-        sendWelcomeEmail(tenantUser).catch((e) => logger.error('Tenant welcome email failed:', e));
+        if (tenantUser.email) {
+          sendWelcomeEmail(tenantUser).catch((e) => logger.error('Tenant welcome email failed:', e));
+        }
       }
 
       const tenancy = await tx.tenancy.create({
@@ -102,6 +113,8 @@ async function create(req, res, next) {
           depositAmount: depositAmount || 0,
           status: 'ACTIVE',
           notes,
+          tenantName: name,
+          tenantPhone: phone,
         },
       });
 
@@ -122,7 +135,7 @@ async function create(req, res, next) {
       },
     });
 
-    return ApiResponse.created(res, tenancy, 'Tenant added successfully');
+    return ApiResponse.created(res, applyTenantDisplay(tenancy, null), 'Tenant added successfully');
   } catch (err) {
     next(err);
   }
@@ -153,7 +166,7 @@ async function getOne(req, res, next) {
 
     if (!tenancy) throw ApiError.notFound('Tenancy not found');
 
-    return ApiResponse.success(res, tenancy);
+    return ApiResponse.success(res, applyTenantDisplay(tenancy, null));
   } catch (err) {
     next(err);
   }
@@ -171,23 +184,22 @@ async function update(req, res, next) {
 
     const { name, phone, rentAmount, depositAmount, endDate, notes } = req.body;
 
-    await prisma.$transaction(async (tx) => {
-      if (name || phone) {
-        await tx.user.update({
-          where: { id: tenancy.tenantId },
-          data: { ...(name && { name }), ...(phone !== undefined && { phone }) },
-        });
-      }
-
-      await tx.tenancy.update({
-        where: { id: req.params.id },
-        data: {
-          ...(rentAmount !== undefined && { rentAmount }),
-          ...(depositAmount !== undefined && { depositAmount }),
-          ...(endDate !== undefined && { endDate: endDate ? new Date(endDate) : null }),
-          ...(notes !== undefined && { notes }),
-        },
-      });
+    // name/phone are this tenancy's own contact snapshot (tenantName/
+    // tenantPhone), not the linked User's fields — the linked User is a
+    // login account that can be shared across multiple tenancies (e.g. an
+    // org reusing one email because it never collected a per-tenant email),
+    // so writing to the User here would silently rename every other
+    // tenancy sharing that account too.
+    await prisma.tenancy.update({
+      where: { id: req.params.id },
+      data: {
+        ...(name && { tenantName: name }),
+        ...(phone !== undefined && { tenantPhone: phone }),
+        ...(rentAmount !== undefined && { rentAmount }),
+        ...(depositAmount !== undefined && { depositAmount }),
+        ...(endDate !== undefined && { endDate: endDate ? new Date(endDate) : null }),
+        ...(notes !== undefined && { notes }),
+      },
     });
 
     const updated = await prisma.tenancy.findUnique({
@@ -199,7 +211,7 @@ async function update(req, res, next) {
       },
     });
 
-    return ApiResponse.success(res, updated, 'Tenant updated');
+    return ApiResponse.success(res, applyTenantDisplay(updated, null), 'Tenant updated');
   } catch (err) {
     next(err);
   }

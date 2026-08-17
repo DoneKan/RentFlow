@@ -6,6 +6,7 @@ import { useCreateInvoice, useUpdateInvoice } from '../../hooks/useInvoices'
 import { getTenants, getTenant } from '../../services/tenant.service'
 import { formatCurrency } from '../../utils/formatters'
 import { addDays, format } from 'date-fns'
+import NumberInput from '../ui/NumberInput'
 
 export default function GenerateInvoiceForm({ onClose, defaultTenantId, invoice }) {
   const isEditing = !!invoice
@@ -140,10 +141,9 @@ export default function GenerateInvoiceForm({ onClose, defaultTenantId, invoice 
                   className="input flex-1"
                   placeholder="Description"
                 />
-                <input
-                  type="number"
+                <NumberInput
                   value={item.amount}
-                  onChange={(e) => updateItem(i, 'amount', e.target.value)}
+                  onChange={(v) => updateItem(i, 'amount', v)}
                   className="input w-32"
                   placeholder="Amount"
                 />
@@ -174,7 +174,7 @@ export default function GenerateInvoiceForm({ onClose, defaultTenantId, invoice 
         </div>
         <div>
           <label className="label">Late penalty</label>
-          <input type="number" value={latePenalty} onChange={(e) => setLatePenalty(e.target.value)} className="input" placeholder="0" />
+          <NumberInput value={latePenalty} onChange={setLatePenalty} placeholder="0" />
         </div>
       </div>
 

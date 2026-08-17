@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Mail, Phone, Home, FileText, CreditCard, Send, Trash2 } from 'lucide-react'
+import { ArrowLeft, Mail, Phone, Home, FileText, CreditCard, Send, Trash2, Pencil } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useTenant, useTerminateTenant } from '../../hooks/useTenants'
 import { useInvoices, useSendReminder } from '../../hooks/useInvoices'
@@ -12,6 +12,7 @@ import Modal from '../../components/ui/Modal'
 import ConfirmDialog from '../../components/ui/ConfirmDialog'
 import GenerateInvoiceForm from '../../components/forms/GenerateInvoiceForm'
 import RecordPaymentForm from '../../components/forms/RecordPaymentForm'
+import EditTenantForm from '../../components/forms/EditTenantForm'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 
 const TABS = ['Overview', 'Invoices', 'Payments']
@@ -23,6 +24,7 @@ export default function TenantDetailPage() {
   const [showInvoice, setShowInvoice] = useState(false)
   const [showPayment, setShowPayment] = useState(false)
   const [showTerminate, setShowTerminate] = useState(false)
+  const [showEdit, setShowEdit] = useState(false)
 
   const { data: tenancy, isLoading } = useTenant(id)
   const terminate = useTerminateTenant()
@@ -90,6 +92,9 @@ export default function TenantDetailPage() {
         </button>
         <h1 className="text-2xl font-bold text-gray-900">{tenant.name}</h1>
         <StatusBadge status={tenancy?.status || 'ACTIVE'} />
+        <button onClick={() => setShowEdit(true)} className="ml-auto flex items-center gap-1.5 text-sm text-brand hover:underline">
+          <Pencil className="h-3.5 w-3.5" /> Edit
+        </button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-6">
@@ -195,6 +200,9 @@ export default function TenantDetailPage() {
         <DataTable columns={paymentCols} data={payments} loading={payLoading} emptyMessage="No payments recorded" />
       )}
 
+      <Modal isOpen={showEdit} onClose={() => setShowEdit(false)} title="Edit Tenant" size="md">
+        <EditTenantForm tenancy={tenancy} onClose={() => setShowEdit(false)} />
+      </Modal>
       <Modal isOpen={showInvoice} onClose={() => setShowInvoice(false)} title="Generate Invoice" size="lg">
         <GenerateInvoiceForm defaultTenantId={id} onClose={() => setShowInvoice(false)} />
       </Modal>

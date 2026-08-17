@@ -1,6 +1,7 @@
 const cron = require('node-cron');
 const { generateInvoiceNumber } = require('../utils/generateCode');
 const { sendDemandNotice } = require('../utils/emailService');
+const { applyTenantDisplay } = require('../utils/tenancyHelpers');
 const logger = require('../utils/logger');
 
 const prisma = require('../utils/prisma');
@@ -184,12 +185,14 @@ async function processOverdueInvoices() {
       },
       include: {
         tenant: true,
+        tenancy: { select: { tenantName: true, tenantPhone: true } },
         unit: true,
         property: true,
       },
     });
 
     for (const invoice of overdueInvoices) {
+      applyTenantDisplay(invoice);
       await prisma.invoice.update({
         where: { id: invoice.id },
         data: { status: 'OVERDUE' },

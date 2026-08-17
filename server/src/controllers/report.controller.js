@@ -1,8 +1,8 @@
 const ApiError = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
 const { syncOverdueStatuses } = require('../jobs/invoiceJob');
-const { attachCurrentTenancy } = require('../utils/tenancyHelpers');
-const { getCompletedPaymentTotalsByProperty } = require('../utils/paymentAggregates');
+const { attachCurrentTenancy, applyTenantDisplayAll } = require('../utils/tenancyHelpers');
+const { getCompletedPaymentTotalsByProperty, getOutstandingBalance, getOutstandingBalanceByProperty } = require('../utils/paymentAggregates');
 
 const prisma = require('../utils/prisma');
 
@@ -74,6 +74,7 @@ async function dashboard(req, res, next) {
         where: { property: { organizationId: orgId }, status: 'OVERDUE', ...propertyFilter },
         include: {
           tenant: { select: { name: true, email: true } },
+          tenancy: { select: { tenantName: true, tenantPhone: true } },
           unit: { select: { unitNumber: true } },
           property: { select: { name: true } },
         },
@@ -92,6 +93,7 @@ async function dashboard(req, res, next) {
               invoiceNumber: true,
               unit: { select: { unitNumber: true } },
               property: { select: { name: true } },
+              tenancy: { select: { tenantName: true, tenantPhone: true } },
             },
           },
         },
@@ -110,6 +112,9 @@ async function dashboard(req, res, next) {
         _sum: { amount: true },
       }),
     ]);
+
+    applyTenantDisplayAll(overdueInvoices);
+    applyTenantDisplayAll(recentPayments, 'invoice.tenancy');
 
     const occupancyRate = totalUnits > 0 ? Math.round((occupiedUnits / totalUnits) * 100) : 0;
     const monthlyRevenue = Number(monthlyPayments._sum.amount || 0);
@@ -148,7 +153,7 @@ async function dashboard(req, res, next) {
 // used by the Dashboard's property filter.
 async function computeOverview(orgId, start, end, propertyId) {
   const propertyFilter = propertyId ? { propertyId } : {};
-  const [revenueAgg, expensesByCategory, outstandingAgg, invoicedAgg] = await Promise.all([
+  const [revenueAgg, expensesByCategory, outstandingBalance, invoicedAgg] = await Promise.all([
     prisma.payment.aggregate({
       where: {
         invoice: { property: { organizationId: orgId }, ...propertyFilter },
@@ -164,16 +169,7 @@ async function computeOverview(orgId, start, end, propertyId) {
       _sum: { amount: true },
       _count: true,
     }),
-    prisma.invoice.aggregate({
-      where: {
-        property: { organizationId: orgId },
-        status: { in: ['SENT', 'OVERDUE'] },
-        dueDate: { lte: end },
-        ...propertyFilter,
-      },
-      _sum: { amount: true },
-      _count: true,
-    }),
+    getOutstandingBalance(prisma, { organizationId: orgId, dueDateLte: end, propertyId }),
     prisma.invoice.aggregate({
       where: { property: { organizationId: orgId }, dueDate: { gte: start, lte: end }, ...propertyFilter },
       _sum: { amount: true },
@@ -183,7 +179,7 @@ async function computeOverview(orgId, start, end, propertyId) {
 
   const revenue = Number(revenueAgg._sum.amount || 0);
   const expensesTotal = expensesByCategory.reduce((s, e) => s + Number(e._sum.amount || 0), 0);
-  const outstanding = Number(outstandingAgg._sum.amount || 0);
+  const outstanding = outstandingBalance.total;
   const invoicedTotal = Number(invoicedAgg._sum.amount || 0);
   const netIncome = revenue - expensesTotal;
   const collectionRate = invoicedTotal > 0 ? Math.round((revenue / invoicedTotal) * 100) : (revenue > 0 ? 100 : 0);
@@ -234,7 +230,7 @@ async function computeOverview(orgId, start, end, propertyId) {
         .map((e) => ({ category: e.category, amount: Number(e._sum.amount || 0), count: e._count }))
         .sort((a, b) => b.amount - a.amount),
     },
-    outstanding: { total: outstanding, count: outstandingAgg._count },
+    outstanding: { total: outstanding, count: outstandingBalance.count },
     invoiced: { total: invoicedTotal, count: invoicedAgg._count },
     netIncome,
     collectionRate,
@@ -271,20 +267,13 @@ async function computeByProperty(orgId, start, end) {
 
   const propertyIds = properties.map((p) => p.id);
 
-  const [outstandingByProperty, invoicedByProperty, revenueByProperty, expensesByPropertyAndCategory] = await Promise.all([
+  const [outstandingMap, invoicedByProperty, revenueByProperty, expensesByPropertyAndCategory] = await Promise.all([
     // Cumulative-to-date unpaid balance per property, matching
     // computeOverview's outstanding definition — not scoped to invoices
     // raised within the selected window, so it doesn't miss earlier
-    // unpaid invoices that are still owed.
-    prisma.invoice.groupBy({
-      by: ['propertyId'],
-      where: {
-        property: { organizationId: orgId, isActive: true },
-        status: { in: ['SENT', 'OVERDUE'] },
-        dueDate: { lte: end },
-      },
-      _sum: { amount: true },
-    }),
+    // unpaid invoices that are still owed. Net of payments already applied
+    // (a partially-paid invoice only contributes its remaining balance).
+    getOutstandingBalanceByProperty(prisma, propertyIds, end),
     prisma.invoice.groupBy({
       by: ['propertyId'],
       where: { propertyId: { in: propertyIds }, dueDate: { gte: start, lte: end } },
@@ -298,7 +287,6 @@ async function computeByProperty(orgId, start, end) {
     }),
   ]);
 
-  const outstandingMap = Object.fromEntries(outstandingByProperty.map((r) => [r.propertyId, Number(r._sum.amount || 0)]));
   const invoicedCountMap = Object.fromEntries(invoicedByProperty.map((r) => [r.propertyId, r._count]));
 
   // expensesByPropertyAndCategory is one row per (property, category) pair
@@ -417,6 +405,7 @@ async function propertyReport(req, res, next) {
         where: { propertyId: id, dueDate: { gte: start, lte: end } },
         include: {
           tenant: { select: { name: true } },
+          tenancy: { select: { tenantName: true, tenantPhone: true } },
           unit: { select: { unitNumber: true } },
           payments: { where: { status: 'COMPLETED' } },
         },
@@ -433,11 +422,14 @@ async function propertyReport(req, res, next) {
         },
         include: {
           tenant: { select: { name: true } },
-          invoice: { select: { invoiceNumber: true } },
+          invoice: { select: { invoiceNumber: true, tenancy: { select: { tenantName: true, tenantPhone: true } } } },
         },
         orderBy: { paidAt: 'desc' },
       }),
     ]);
+
+    applyTenantDisplayAll(invoices);
+    applyTenantDisplayAll(payments, 'invoice.tenancy');
 
     const totalRevenue = payments.reduce((s, p) => s + Number(p.amount), 0);
     const totalExpenses = expenses.reduce((s, e) => s + Number(e.amount), 0);
@@ -549,11 +541,13 @@ async function exportReport(req, res, next) {
             invoiceNumber: true,
             unit: { select: { unitNumber: true } },
             property: { select: { name: true, code: true } },
+            tenancy: { select: { tenantName: true, tenantPhone: true } },
           },
         },
       },
       orderBy: { paidAt: 'asc' },
     });
+    applyTenantDisplayAll(payments, 'invoice.tenancy');
 
     const rows = [
       ['Receipt No', 'Date', 'Tenant', 'Property', 'Unit', 'Invoice', 'Amount', 'Method'],

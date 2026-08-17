@@ -2,6 +2,7 @@ const ApiError = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
 
 const prisma = require('../utils/prisma');
+const { applyTenantDisplayAll } = require('../utils/tenancyHelpers');
 
 function startOfMonth(year, month) {
   return new Date(year, month - 1, 1);
@@ -53,12 +54,20 @@ async function getMyPortal(req, res, next) {
         where: { invoice: { propertyId: { in: propertyIds } }, status: 'COMPLETED' },
         include: {
           tenant: { select: { name: true } },
-          invoice: { select: { invoiceNumber: true, property: { select: { name: true } }, unit: { select: { unitNumber: true } } } },
+          invoice: {
+            select: {
+              invoiceNumber: true,
+              property: { select: { name: true } },
+              unit: { select: { unitNumber: true } },
+              tenancy: { select: { tenantName: true, tenantPhone: true } },
+            },
+          },
         },
         orderBy: { paidAt: 'desc' },
         take: 10,
       }),
     ]);
+    applyTenantDisplayAll(recentPayments, 'invoice.tenancy');
 
     const totalUnits = properties.reduce((s, p) => s + p.units.length, 0);
     const occupiedUnits = properties.reduce((s, p) => s + p.units.filter((u) => u.status === 'OCCUPIED').length, 0);
@@ -101,7 +110,16 @@ async function getPropertyStatement(req, res, next) {
     const [payments, expenses] = await Promise.all([
       prisma.payment.findMany({
         where: { invoice: { propertyId: id }, status: 'COMPLETED', paidAt: { gte: start, lte: end } },
-        include: { tenant: { select: { name: true } }, invoice: { select: { invoiceNumber: true, unit: { select: { unitNumber: true } } } } },
+        include: {
+          tenant: { select: { name: true } },
+          invoice: {
+            select: {
+              invoiceNumber: true,
+              unit: { select: { unitNumber: true } },
+              tenancy: { select: { tenantName: true, tenantPhone: true } },
+            },
+          },
+        },
         orderBy: { paidAt: 'asc' },
       }),
       prisma.expense.findMany({
@@ -109,6 +127,8 @@ async function getPropertyStatement(req, res, next) {
         orderBy: { date: 'asc' },
       }),
     ]);
+
+    applyTenantDisplayAll(payments, 'invoice.tenancy');
 
     const revenue = payments.reduce((s, p) => s + Number(p.amount), 0);
     const expensesTotal = expenses.reduce((s, e) => s + Number(e.amount), 0);

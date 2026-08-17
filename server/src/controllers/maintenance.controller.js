@@ -2,6 +2,7 @@ const ApiError = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
 
 const prisma = require('../utils/prisma');
+const { applyTenantDisplay, applyTenantDisplayAll } = require('../utils/tenancyHelpers');
 
 async function list(req, res, next) {
   try {
@@ -25,6 +26,7 @@ async function list(req, res, next) {
           tenant: { select: { id: true, name: true, email: true, phone: true } },
           unit: { select: { id: true, unitNumber: true, type: true } },
           property: { select: { id: true, name: true, code: true } },
+          tenancy: { select: { tenantName: true, tenantPhone: true } },
         },
         orderBy: { createdAt: 'desc' },
         skip,
@@ -32,6 +34,8 @@ async function list(req, res, next) {
       }),
       prisma.maintenanceRequest.count({ where }),
     ]);
+
+    applyTenantDisplayAll(requests);
 
     return ApiResponse.paginated(res, requests, {
       page: parseInt(page),
@@ -54,13 +58,14 @@ async function getOne(req, res, next) {
         tenant: { select: { id: true, name: true, email: true, phone: true } },
         unit: { select: { id: true, unitNumber: true, type: true } },
         property: { select: { id: true, name: true, code: true } },
-        tenancy: { select: { id: true, startDate: true, rentAmount: true } },
+        tenancy: { select: { id: true, startDate: true, rentAmount: true, tenantName: true, tenantPhone: true } },
       },
     });
 
     if (!request) throw ApiError.notFound('Maintenance request not found');
     if (isTenant && request.tenantId !== req.user.id) throw ApiError.forbidden();
     if (!isTenant && request.property.organizationId !== req.user.organizationId) throw ApiError.forbidden();
+    applyTenantDisplay(request);
 
     return ApiResponse.success(res, request);
   } catch (err) {
@@ -105,8 +110,10 @@ async function create(req, res, next) {
         tenant: { select: { id: true, name: true } },
         unit: { select: { id: true, unitNumber: true } },
         property: { select: { id: true, name: true } },
+        tenancy: { select: { tenantName: true, tenantPhone: true } },
       },
     });
+    applyTenantDisplay(request);
 
     return ApiResponse.created(res, request, 'Maintenance request submitted');
   } catch (err) {
@@ -150,8 +157,10 @@ async function update(req, res, next) {
         tenant: { select: { id: true, name: true } },
         unit: { select: { id: true, unitNumber: true } },
         property: { select: { id: true, name: true } },
+        tenancy: { select: { tenantName: true, tenantPhone: true } },
       },
     });
+    applyTenantDisplay(request);
 
     return ApiResponse.success(res, request, 'Maintenance request updated');
   } catch (err) {
@@ -184,8 +193,10 @@ async function assign(req, res, next) {
         unit: { select: { id: true, unitNumber: true } },
         property: { select: { id: true, name: true } },
         vendor: { select: { id: true, name: true, category: true, phone: true } },
+        tenancy: { select: { tenantName: true, tenantPhone: true } },
       },
     });
+    applyTenantDisplay(request);
 
     return ApiResponse.success(res, request, 'Vendor assigned');
   } catch (err) {
@@ -218,8 +229,10 @@ async function complete(req, res, next) {
         unit: { select: { id: true, unitNumber: true } },
         property: { select: { id: true, name: true } },
         vendor: { select: { id: true, name: true, category: true } },
+        tenancy: { select: { tenantName: true, tenantPhone: true } },
       },
     });
+    applyTenantDisplay(request);
 
     return ApiResponse.success(res, request, 'Marked as complete');
   } catch (err) {

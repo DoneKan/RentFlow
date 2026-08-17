@@ -37,6 +37,15 @@ const baseStyles = `
 
 async function sendEmail({ to, subject, html, text, attachments = [] }) {
   try {
+    // Tenants can now be entered with no email (phone-first), so any of
+    // the tenant-facing senders below (invoice, receipt, reminder, demand
+    // notice) may be called with a null `to` — skip quietly rather than
+    // handing an invalid recipient to the transport, or making every call
+    // site individually guard for it.
+    if (!to) {
+      logger.info(`Email skipped (no recipient address): ${subject}`);
+      return { success: false, reason: 'No recipient email' };
+    }
     if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
       logger.warn(`Email not sent (no SMTP config): ${subject} to ${to}`);
       return { success: false, reason: 'No SMTP configuration' };

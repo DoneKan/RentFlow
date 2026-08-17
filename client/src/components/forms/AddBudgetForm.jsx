@@ -4,6 +4,7 @@ import { Plus, X } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useCreateBudget } from '../../hooks/useBudgets'
 import { getProperties } from '../../services/property.service'
+import NumberInput from '../ui/NumberInput'
 
 const CATEGORIES = ['RENTAL_INCOME', 'UTILITIES', 'SECURITY', 'MAINTENANCE', 'KCCA_TAX', 'URA_TAX', 'REPAIRS', 'INSURANCE', 'LAND_ACQUISITION', 'CONSTRUCTION', 'OTHER']
 
@@ -78,10 +79,9 @@ export default function AddBudgetForm({ onClose }) {
               <select value={line.category} onChange={(e) => setLine(i, 'category', e.target.value)} className="input flex-1">
                 {CATEGORIES.map((c) => <option key={c} value={c}>{c.replace('_', ' ')}</option>)}
               </select>
-              <input
-                type="number"
+              <NumberInput
                 value={line.plannedAmount}
-                onChange={(e) => setLine(i, 'plannedAmount', e.target.value)}
+                onChange={(v) => setLine(i, 'plannedAmount', v)}
                 className="input w-32"
                 placeholder="Amount"
               />

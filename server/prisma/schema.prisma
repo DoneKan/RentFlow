@@ -41,7 +41,15 @@ model Organization {
 
 model User {
   id             String   @id @default(cuid())
-  email          String   @unique
+  // Nullable: tenants are commonly entered with only a phone number (SMS is
+  // the reliable channel; many landlords never collect a per-tenant email).
+  // Still @unique — Postgres treats every NULL as distinct under a unique
+  // constraint, so any number of email-less users can coexist. Staff/owner
+  // accounts still require an email at the Joi-validation layer (their auth
+  // route), since email+password is still their only login method — a
+  // tenant with no email simply has no portal login, which is fine since
+  // SMS/PDF-download cover their needs without one.
+  email          String?  @unique
   password       String
   name           String
   phone          String?
@@ -163,6 +171,15 @@ model Tenancy {
   depositAmount Decimal   @default(0)
   status        String    @default("ACTIVE")
   notes         String?
+  // Per-tenancy contact snapshot, deliberately separate from the linked
+  // User's own name/phone. The linked User is a login account, and one
+  // account (one email) can be reused across multiple Tenancy rows when an
+  // org doesn't collect a distinct email per tenant — so the account's own
+  // name/phone can't double as "this tenancy's tenant display info" without
+  // every tenancy sharing that account aliasing to the same values. This is
+  // what every "tenant name" read/write should use instead of tenant.name.
+  tenantName    String
+  tenantPhone   String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 

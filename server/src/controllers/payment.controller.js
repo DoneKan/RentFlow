@@ -9,6 +9,7 @@ const airtelService = require('../services/airtelService');
 const logger = require('../utils/logger');
 
 const prisma = require('../utils/prisma');
+const { applyTenantDisplay, applyTenantDisplayAll } = require('../utils/tenancyHelpers');
 
 async function uniqueReceiptNumber() {
   let rn = generateReceiptNumber();
@@ -24,11 +25,12 @@ async function completePayment(paymentId) {
   const payment = await prisma.payment.findUnique({
     where: { id: paymentId },
     include: {
-      invoice: { include: { unit: true, property: true } },
+      invoice: { include: { unit: true, property: true, tenancy: { select: { tenantName: true, tenantPhone: true } } } },
       tenant: true,
     },
   });
   if (!payment) return;
+  applyTenantDisplay(payment, 'invoice.tenancy');
 
   const paidAt = new Date();
   await prisma.$transaction(async (tx) => {
@@ -36,10 +38,18 @@ async function completePayment(paymentId) {
       where: { id: paymentId },
       data: { status: 'COMPLETED', paidAt },
     });
-    await tx.invoice.update({
-      where: { id: payment.invoiceId },
-      data: { status: 'PAID', paidAt },
+
+    const paidAgg = await tx.payment.aggregate({
+      where: { invoiceId: payment.invoiceId, status: 'COMPLETED' },
+      _sum: { amount: true },
     });
+    const totalPaid = Number(paidAgg._sum.amount || 0);
+    if (totalPaid >= Number(payment.invoice.amount)) {
+      await tx.invoice.update({
+        where: { id: payment.invoiceId },
+        data: { status: 'PAID', paidAt },
+      });
+    }
   });
 
   postPaymentEntry(prisma, {
@@ -83,6 +93,7 @@ async function list(req, res, next) {
               id: true, invoiceNumber: true, amount: true,
               unit: { select: { unitNumber: true } },
               property: { select: { name: true, code: true } },
+              tenancy: { select: { tenantName: true, tenantPhone: true } },
             },
           },
         },
@@ -92,6 +103,8 @@ async function list(req, res, next) {
       }),
       prisma.payment.count({ where }),
     ]);
+
+    applyTenantDisplayAll(payments, 'invoice.tenancy');
 
     return ApiResponse.paginated(res, payments, {
       total, page: parseInt(page), limit: parseInt(limit), pages: Math.ceil(total / parseInt(limit)),
@@ -110,11 +123,12 @@ async function recordManual(req, res, next) {
         id: invoiceId,
         property: { organizationId: req.user.organizationId },
       },
-      include: { unit: true, property: true, tenant: true },
+      include: { unit: true, property: true, tenant: true, tenancy: { select: { tenantName: true, tenantPhone: true } } },
     });
     if (!invoice) throw ApiError.notFound('Invoice not found');
     if (invoice.status === 'PAID') throw ApiError.conflict('Invoice already paid');
     if (invoice.status === 'CANCELLED') throw ApiError.badRequest('Invoice is cancelled');
+    applyTenantDisplay(invoice, 'tenancy');
 
     const receiptNumber = await uniqueReceiptNumber();
 
@@ -131,10 +145,23 @@ async function recordManual(req, res, next) {
           notes,
         },
       });
-      await tx.invoice.update({
-        where: { id: invoiceId },
-        data: { status: 'PAID', paidAt: new Date() },
+
+      // Only close the invoice out once completed payments actually cover
+      // it — a partial payment (amount < invoice.amount) records against
+      // the invoice but leaves it SENT/OVERDUE with a reduced balance,
+      // rather than marking the whole thing PAID regardless of how much
+      // was actually paid.
+      const paidAgg = await tx.payment.aggregate({
+        where: { invoiceId, status: 'COMPLETED' },
+        _sum: { amount: true },
       });
+      const totalPaid = Number(paidAgg._sum.amount || 0);
+      if (totalPaid >= Number(invoice.amount)) {
+        await tx.invoice.update({
+          where: { id: invoiceId },
+          data: { status: 'PAID', paidAt: new Date() },
+        });
+      }
       return p;
     });
 
@@ -155,9 +182,10 @@ async function recordManual(req, res, next) {
       where: { id: payment.id },
       include: {
         tenant: { select: { id: true, name: true, email: true } },
-        invoice: { select: { invoiceNumber: true, amount: true } },
+        invoice: { select: { invoiceNumber: true, amount: true, tenancy: { select: { tenantName: true, tenantPhone: true } } } },
       },
     });
+    applyTenantDisplay(fullPayment, 'invoice.tenancy');
 
     return ApiResponse.created(res, fullPayment, 'Payment recorded successfully');
   } catch (err) {
@@ -178,11 +206,13 @@ async function getOne(req, res, next) {
           include: {
             unit: true,
             property: true,
+            tenancy: { select: { tenantName: true, tenantPhone: true } },
           },
         },
       },
     });
     if (!payment) throw ApiError.notFound('Payment not found');
+    applyTenantDisplay(payment, 'invoice.tenancy');
 
     return ApiResponse.success(res, payment);
   } catch (err) {
@@ -199,11 +229,12 @@ async function getReceipt(req, res, next) {
       },
       include: {
         tenant: true,
-        invoice: { include: { unit: true, property: true } },
+        invoice: { include: { unit: true, property: true, tenancy: { select: { tenantName: true, tenantPhone: true } } } },
       },
     });
     if (!payment) throw ApiError.notFound('Payment not found');
     if (payment.status !== 'COMPLETED') throw ApiError.badRequest('Receipt only available for completed payments');
+    applyTenantDisplay(payment, 'invoice.tenancy');
 
     const pdfBuffer = await generateReceipt(payment, payment.invoice, payment.tenant, payment.invoice.unit, payment.invoice.property);
 

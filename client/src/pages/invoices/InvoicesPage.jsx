@@ -54,6 +54,17 @@ export default function InvoicesPage() {
     { key: 'tenant', label: 'Tenant', render: (t) => <span className="font-medium">{t?.name || '—'}</span> },
     { key: 'unit', label: 'Property / Unit', render: (u, row) => <span className="text-gray-600">{row.property?.name} · #{u?.unitNumber}</span> },
     { key: 'amount', label: 'Amount', render: (v) => <span className="font-semibold">{formatCurrency(v)}</span> },
+    {
+      key: 'payments', label: 'Balance Due',
+      render: (payments, row) => {
+        if (row.status === 'PAID' || row.status === 'CANCELLED') return <span className="text-gray-400">—</span>
+        const paid = (payments || []).reduce((sum, p) => sum + Number(p.amount), 0)
+        const balance = Math.max(Number(row.amount) - paid, 0)
+        return balance < Number(row.amount)
+          ? <span className="font-semibold text-red-600">{formatCurrency(balance)}</span>
+          : <span className="text-gray-500">{formatCurrency(balance)}</span>
+      },
+    },
     { key: 'dueDate', label: 'Due Date', render: (v) => formatDate(v) },
     {
       key: 'status', label: 'Status',

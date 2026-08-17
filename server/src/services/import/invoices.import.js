@@ -154,8 +154,12 @@ function validateRow(fields, context) {
   const tenantEmailRaw = fields.tenantEmail.trim();
   if (tenantEmailRaw && !EMAIL_RE.test(tenantEmailRaw)) {
     errors.push(`Tenant Email must be a valid email address (got "${tenantEmailRaw}").`);
-  } else if (tenantEmailRaw && tenancy && tenancy.tenant.email.toLowerCase() !== tenantEmailRaw.toLowerCase()) {
-    errors.push(`Unit "${unitNumberRaw}" under property "${property.name}" (code: ${property.code}) is currently tenanted by ${tenancy.tenant.email}, not "${tenantEmailRaw}". Leave Tenant Email blank to skip this check, or fix the mismatch.`);
+  } else if (tenantEmailRaw && tenancy && (tenancy.tenant.email || '').toLowerCase() !== tenantEmailRaw.toLowerCase()) {
+    errors.push(
+      tenancy.tenant.email
+        ? `Unit "${unitNumberRaw}" under property "${property.name}" (code: ${property.code}) is currently tenanted by ${tenancy.tenant.email}, not "${tenantEmailRaw}". Leave Tenant Email blank to skip this check, or fix the mismatch.`
+        : `Unit "${unitNumberRaw}" under property "${property.name}" (code: ${property.code}) is currently tenanted by someone with no email on file, not "${tenantEmailRaw}". Leave Tenant Email blank to skip this check.`
+    );
   }
 
   if (tenancy && unit) {

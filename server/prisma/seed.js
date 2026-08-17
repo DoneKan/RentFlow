@@ -248,6 +248,8 @@ async function main() {
         rentAmount: def.rent,
         depositAmount: def.rent,
         status: 'ACTIVE',
+        tenantName: def.tenant.name,
+        tenantPhone: def.tenant.phone,
       },
     });
     await prisma.unit.update({ where: { id: def.unit.id }, data: { status: 'OCCUPIED' } });

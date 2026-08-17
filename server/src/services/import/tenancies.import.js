@@ -9,8 +9,8 @@ const columns = [
   { key: 'propertyName', header: 'Property Name', required: true },
   { key: 'unitNumber', header: 'Unit Number', required: true },
   { key: 'tenantName', header: 'Tenant Name', required: true },
-  { key: 'tenantEmail', header: 'Tenant Email', required: true },
-  { key: 'tenantPhone', header: 'Tenant Phone', required: false },
+  { key: 'tenantEmail', header: 'Tenant Email', required: false },
+  { key: 'tenantPhone', header: 'Tenant Phone', required: true },
   { key: 'startDate', header: 'Start Date', required: true },
   { key: 'endDate', header: 'End Date', required: false },
   { key: 'rentAmount', header: 'Rent Amount', required: false },
@@ -77,7 +77,7 @@ async function prefetchContext(prisma, organizationId) {
   // different rules for the same lookup, and avoids racing the DB's unique
   // constraint by trying to create a user whose email exists in another org.
   const users = await prisma.user.findMany({ select: { id: true, email: true, role: true } });
-  const usersByEmail = new Map(users.map((u) => [u.email.toLowerCase(), u]));
+  const usersByEmail = new Map(users.filter((u) => u.email).map((u) => [u.email.toLowerCase(), u]));
 
   return {
     propertyIndex: { exactByName, caseInsensitiveByName },
@@ -147,22 +147,31 @@ function validateRow(fields, context, rowNumber) {
   else if (tenantName.length > 100) errors.push('Tenant Name must be 100 characters or fewer.');
   normalized.tenantName = tenantName;
 
+  // Email is optional — phone is the field required to reach a tenant
+  // reliably (SMS), and requiring an email here is what used to push
+  // importers to reuse one placeholder address across many rows, silently
+  // merging unrelated tenants onto the same account. Leave it blank and
+  // this row always gets its own new tenant account (see commitRow).
   const emailRaw = fields.tenantEmail.trim().toLowerCase();
-  if (!emailRaw) {
-    errors.push('Tenant Email is required.');
-  } else if (!EMAIL_RE.test(emailRaw)) {
-    errors.push(`Tenant Email must be a valid email address (got "${fields.tenantEmail.trim()}").`);
-  } else {
-    normalized.tenantEmail = emailRaw;
-    const existingUser = context.usersByEmail.get(emailRaw);
-    if (existingUser && existingUser.role !== 'TENANT') {
-      errors.push(`"${emailRaw}" already belongs to an existing ${existingUser.role} account, not a tenant — use a different email for this tenancy.`);
-    } else if (existingUser) {
-      normalized.existingTenantId = existingUser.id;
+  if (emailRaw) {
+    if (!EMAIL_RE.test(emailRaw)) {
+      errors.push(`Tenant Email must be a valid email address (got "${fields.tenantEmail.trim()}").`);
+    } else {
+      normalized.tenantEmail = emailRaw;
+      const existingUser = context.usersByEmail.get(emailRaw);
+      if (existingUser && existingUser.role !== 'TENANT') {
+        errors.push(`"${emailRaw}" already belongs to an existing ${existingUser.role} account, not a tenant — use a different email for this tenancy.`);
+      } else if (existingUser) {
+        normalized.existingTenantId = existingUser.id;
+      }
     }
+  } else {
+    normalized.tenantEmail = null;
   }
 
-  normalized.tenantPhone = fields.tenantPhone.trim() || null;
+  const phoneRaw = fields.tenantPhone.trim();
+  if (!phoneRaw) errors.push('Tenant Phone is required.');
+  normalized.tenantPhone = phoneRaw || null;
 
   const startRaw = fields.startDate.trim();
   let startDate = null;
@@ -240,7 +249,14 @@ async function commitRow(tx, organizationId, userId, normalized) {
   let newTenant = null;
 
   if (!tenantId) {
-    const alreadyCreated = await tx.user.findUnique({ where: { email: normalized.tenantEmail } });
+    // Only look up a possible duplicate when this row actually has an
+    // email — `findUnique({ where: { email: null } })` would match
+    // *some* email-less user (LIMIT-1 semantics on a column where many
+    // rows can legitimately be NULL), silently attaching this row's
+    // tenancy to a completely unrelated tenant.
+    const alreadyCreated = normalized.tenantEmail
+      ? await tx.user.findUnique({ where: { email: normalized.tenantEmail } })
+      : null;
     if (alreadyCreated) {
       tenantId = alreadyCreated.id;
     } else {
@@ -270,6 +286,8 @@ async function commitRow(tx, organizationId, userId, normalized) {
       depositAmount: normalized.depositAmount,
       status: 'ACTIVE',
       notes: normalized.notes,
+      tenantName: normalized.tenantName,
+      tenantPhone: normalized.tenantPhone,
     },
   });
 
@@ -279,7 +297,7 @@ async function commitRow(tx, organizationId, userId, normalized) {
 }
 
 async function afterCommit(results) {
-  const newTenants = results.map((r) => r.newTenant).filter(Boolean);
+  const newTenants = results.map((r) => r.newTenant).filter((t) => t?.email);
   await Promise.all(newTenants.map((t) => sendWelcomeEmail(t)));
 }
 

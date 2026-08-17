@@ -6,6 +6,7 @@ import { getTenants } from '../../services/tenant.service'
 import { getInvoices } from '../../services/invoice.service'
 import { PAYMENT_METHODS } from '../../utils/constants'
 import { formatCurrency, formatDate } from '../../utils/formatters'
+import NumberInput from '../ui/NumberInput'
 
 export default function RecordPaymentForm({ onClose, defaultTenantId, defaultInvoiceId }) {
   const record = useRecordPayment()
@@ -91,7 +92,7 @@ export default function RecordPaymentForm({ onClose, defaultTenantId, defaultInv
         <select value={form.tenantId} onChange={handleTenantChange} className="input" required>
           <option value="">Select tenant…</option>
           {(tenantsData || []).map((t) => (
-            <option key={t.id} value={t.tenantId}>{t.tenant?.name} — {t.property?.name}</option>
+            <option key={t.id} value={t.tenantId}>{t.tenant?.name} — {t.property?.name} Unit {t.unit?.unitNumber}</option>
           ))}
         </select>
       </div>
@@ -116,11 +117,9 @@ export default function RecordPaymentForm({ onClose, defaultTenantId, defaultInv
 
       <div>
         <label className="label">Amount *</label>
-        <input
-          type="number"
+        <NumberInput
           value={form.amount}
-          onChange={(e) => set('amount', e.target.value)}
-          className="input"
+          onChange={(v) => set('amount', v)}
           placeholder={selectedInvoice ? `Invoice: ${formatCurrency(selectedInvoice.amount)}` : '0'}
           required
         />

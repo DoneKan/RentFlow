@@ -4,6 +4,7 @@ import toast from 'react-hot-toast'
 import { useQueryClient } from '@tanstack/react-query'
 import { createUnit } from '../../services/unit.service'
 import { PAYMENT_PERIODS, UNIT_TYPES } from '../../utils/constants'
+import NumberInput from '../ui/NumberInput'
 
 export default function AddUnitForm({ propertyId, onClose }) {
   const qc = useQueryClient()
@@ -100,7 +101,7 @@ export default function AddUnitForm({ propertyId, onClose }) {
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="label">Rent amount *</label>
-          <input type="number" value={form.rentAmount} onChange={(e) => set('rentAmount', e.target.value)} className="input" placeholder="800000" required />
+          <NumberInput value={form.rentAmount} onChange={(v) => set('rentAmount', v)} placeholder="800000" required />
         </div>
         <div>
           <label className="label">Payment period</label>
@@ -120,10 +121,9 @@ export default function AddUnitForm({ propertyId, onClose }) {
             className="input flex-1"
             placeholder="e.g. Security"
           />
-          <input
-            type="number"
+          <NumberInput
             value={chargeInput.amount}
-            onChange={(e) => setChargeInput((p) => ({ ...p, amount: e.target.value }))}
+            onChange={(v) => setChargeInput((p) => ({ ...p, amount: v }))}
             className="input w-28"
             placeholder="30000"
           />

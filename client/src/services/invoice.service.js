@@ -6,6 +6,9 @@ export const getInvoices = (params) =>
 export const getInvoice = (id) =>
   api.get(`/invoices/${id}`).then((r) => r.data)
 
+export const downloadInvoice = (id) =>
+  api.get(`/invoices/${id}/download`, { responseType: 'blob' }).then((r) => r.data)
+
 export const createInvoice = (data) =>
   api.post('/invoices', data).then((r) => r.data)
 

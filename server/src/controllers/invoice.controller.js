@@ -7,6 +7,7 @@ const { syncOverdueStatuses } = require('../jobs/invoiceJob');
 const logger = require('../utils/logger');
 
 const prisma = require('../utils/prisma');
+const { applyTenantDisplay, applyTenantDisplayAll } = require('../utils/tenancyHelpers');
 
 function parseAdditionalCharges(unit) {
   if (!unit) return unit;
@@ -79,6 +80,7 @@ async function list(req, res, next) {
         where,
         include: {
           tenant: { select: { id: true, name: true, email: true } },
+          tenancy: { select: { tenantName: true, tenantPhone: true } },
           unit: { select: { id: true, unitNumber: true } },
           property: { select: { id: true, name: true, code: true } },
           payments: { where: { status: 'COMPLETED' }, select: { id: true, amount: true, method: true, paidAt: true } },
@@ -89,6 +91,8 @@ async function list(req, res, next) {
       }),
       prisma.invoice.count({ where }),
     ]);
+
+    applyTenantDisplayAll(invoices);
 
     return ApiResponse.paginated(res, invoices.map(parseInvoiceItems), {
       total,
@@ -141,12 +145,13 @@ async function create(req, res, next) {
       },
       include: {
         tenant: { select: { id: true, name: true, email: true } },
+        tenancy: { select: { tenantName: true, tenantPhone: true } },
         unit: { select: { id: true, unitNumber: true, type: true } },
         property: { select: { id: true, name: true, code: true } },
       },
     });
 
-    return ApiResponse.created(res, parseInvoiceItems(invoice), 'Invoice created');
+    return ApiResponse.created(res, parseInvoiceItems(applyTenantDisplay(invoice)), 'Invoice created');
   } catch (err) {
     next(err);
   }
@@ -181,12 +186,13 @@ async function update(req, res, next) {
       },
       include: {
         tenant: { select: { id: true, name: true, email: true } },
+        tenancy: { select: { tenantName: true, tenantPhone: true } },
         unit: { select: { id: true, unitNumber: true, type: true } },
         property: { select: { id: true, name: true, code: true } },
       },
     });
 
-    return ApiResponse.success(res, parseInvoiceItems(updated), 'Invoice updated');
+    return ApiResponse.success(res, parseInvoiceItems(applyTenantDisplay(updated)), 'Invoice updated');
   } catch (err) {
     next(err);
   }
@@ -201,6 +207,7 @@ async function getOne(req, res, next) {
       },
       include: {
         tenant: { select: { id: true, name: true, email: true, phone: true } },
+        tenancy: { select: { tenantName: true, tenantPhone: true } },
         unit: true,
         property: true,
         payments: { orderBy: { createdAt: 'desc' } },
@@ -209,7 +216,35 @@ async function getOne(req, res, next) {
 
     if (!invoice) throw ApiError.notFound('Invoice not found');
 
-    return ApiResponse.success(res, parseInvoiceItems(invoice));
+    return ApiResponse.success(res, parseInvoiceItems(applyTenantDisplay(invoice)));
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function downloadInvoice(req, res, next) {
+  try {
+    const invoice = await prisma.invoice.findFirst({
+      where: {
+        id: req.params.id,
+        property: { organizationId: req.user.organizationId },
+      },
+      include: {
+        tenant: true,
+        tenancy: { select: { tenantName: true, tenantPhone: true } },
+        unit: true,
+        property: true,
+      },
+    });
+    if (!invoice) throw ApiError.notFound('Invoice not found');
+
+    const parsed = parseInvoiceItems(applyTenantDisplay(invoice));
+    const pdfBuffer = await generateInvoice(parsed, parsed.tenant, parsed.unit, parsed.property);
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${invoice.invoiceNumber}.pdf"`);
+    res.setHeader('Content-Length', pdfBuffer.length);
+    res.send(pdfBuffer);
   } catch (err) {
     next(err);
   }
@@ -224,6 +259,7 @@ async function sendInvoice(req, res, next) {
       },
       include: {
         tenant: true,
+        tenancy: { select: { tenantName: true, tenantPhone: true } },
         unit: true,
         property: true,
       },
@@ -233,16 +269,19 @@ async function sendInvoice(req, res, next) {
       throw ApiError.badRequest(`Cannot send a ${invoice.status.toLowerCase()} invoice`);
     }
 
-    const parsed = parseInvoiceItems(invoice);
+    const parsed = parseInvoiceItems(applyTenantDisplay(invoice));
     const pdfBuffer = await generateInvoice(parsed, parsed.tenant, parsed.unit, parsed.property);
-    await sendInvoiceEmail(parsed.tenant, parsed, parsed.unit, parsed.property, pdfBuffer);
+    const emailResult = await sendInvoiceEmail(parsed.tenant, parsed, parsed.unit, parsed.property, pdfBuffer);
 
     await prisma.invoice.update({
       where: { id: invoice.id },
       data: { status: 'SENT', sentAt: new Date() },
     });
 
-    return ApiResponse.success(res, null, 'Invoice sent to tenant');
+    const message = parsed.tenant.email
+      ? 'Invoice sent to tenant'
+      : 'Invoice marked as sent — tenant has no email on file, so nothing was emailed. Download the PDF to deliver it another way.';
+    return ApiResponse.success(res, { emailed: !!emailResult.success }, message);
   } catch (err) {
     next(err);
   }
@@ -255,9 +294,19 @@ async function sendReminder(req, res, next) {
         id: req.params.id,
         property: { organizationId: req.user.organizationId },
       },
-      include: { tenant: true, unit: true, property: true },
+      include: {
+        tenant: true,
+        tenancy: { select: { tenantName: true, tenantPhone: true } },
+        unit: true,
+        property: true,
+      },
     });
     if (!invoice) throw ApiError.notFound('Invoice not found');
+    applyTenantDisplay(invoice);
+
+    if (!invoice.tenant.email) {
+      return ApiResponse.success(res, { emailed: false }, 'Tenant has no email on file — no reminder was sent. SMS reminders are not yet available.');
+    }
 
     if (invoice.status === 'OVERDUE') {
       await sendDemandNotice(invoice.tenant, invoice, invoice.unit, invoice.property);
@@ -265,7 +314,7 @@ async function sendReminder(req, res, next) {
       await sendRentReminder(invoice.tenant, invoice, invoice.unit, invoice.property);
     }
 
-    return ApiResponse.success(res, null, 'Reminder sent to tenant');
+    return ApiResponse.success(res, { emailed: true }, 'Reminder sent to tenant');
   } catch (err) {
     next(err);
   }
@@ -293,4 +342,4 @@ async function cancel(req, res, next) {
   }
 }
 
-module.exports = { list, create, update, getOne, sendInvoice, sendReminder, cancel, buildInvoiceItems };
+module.exports = { list, create, update, getOne, downloadInvoice, sendInvoice, sendReminder, cancel, buildInvoiceItems };

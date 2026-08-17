@@ -3,6 +3,7 @@ import { ArrowLeft, Download, Send, X, CreditCard, AlertTriangle, Clock } from '
 import { differenceInCalendarDays } from 'date-fns'
 import toast from 'react-hot-toast'
 import { useInvoice, useSendInvoice, useSendReminder, useCancelInvoice } from '../../hooks/useInvoices'
+import { downloadInvoice } from '../../services/invoice.service'
 import { formatCurrency, formatDate, formatDateTime } from '../../utils/formatters'
 import StatusBadge from '../../components/ui/StatusBadge'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
@@ -16,6 +17,7 @@ export default function InvoiceDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const [showPayment, setShowPayment] = useState(false)
+  const [downloading, setDownloading] = useState(false)
   const { data: invoice, isLoading } = useInvoice(id)
   const sendInvoice = useSendInvoice()
   const sendReminder = useSendReminder()
@@ -26,6 +28,10 @@ export default function InvoiceDetailPage() {
 
   const items = Array.isArray(invoice.items) ? invoice.items : []
   const priorUnpaid = Number(invoice.priorUnpaidAmount) || 0
+  const amountPaid = (invoice.payments || [])
+    .filter((p) => p.status === 'COMPLETED')
+    .reduce((sum, p) => sum + Number(p.amount), 0)
+  const balanceDue = Math.max(Number(invoice.amount) - amountPaid, 0)
   const draftAgeDays = invoice.status === 'DRAFT' ? differenceInCalendarDays(new Date(), new Date(invoice.createdAt)) : 0
   const isStaleDraft = draftAgeDays >= STALE_DRAFT_DAYS
 
@@ -41,6 +47,22 @@ export default function InvoiceDetailPage() {
     if (!window.confirm('Cancel this invoice?')) return
     try { await cancelInvoice.mutateAsync(id); toast.success('Cancelled'); navigate('/invoices') }
     catch { toast.error('Failed to cancel') }
+  }
+  const handleDownload = async () => {
+    setDownloading(true)
+    try {
+      const blob = await downloadInvoice(id)
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${invoice.invoiceNumber}.pdf`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      toast.error('Failed to download invoice')
+    } finally {
+      setDownloading(false)
+    }
   }
 
   return (
@@ -186,6 +208,9 @@ export default function InvoiceDetailPage() {
         <div className="space-y-3">
           <div className="card space-y-3">
             <h3 className="font-semibold text-gray-900">Actions</h3>
+            <button onClick={handleDownload} disabled={downloading} className="btn-secondary w-full flex items-center justify-center gap-2">
+              <Download className="h-4 w-4" /> {downloading ? 'Downloading…' : 'Download PDF'}
+            </button>
             {invoice.status !== 'PAID' && invoice.status !== 'CANCELLED' && (
               <button onClick={() => setShowPayment(true)} className="btn-primary w-full flex items-center justify-center gap-2">
                 <CreditCard className="h-4 w-4" /> Record Payment
@@ -211,6 +236,12 @@ export default function InvoiceDetailPage() {
           <div className="card text-sm space-y-2">
             <h3 className="font-semibold text-gray-900 mb-2">Summary</h3>
             <div className="flex justify-between"><span className="text-gray-500">Amount</span><span className="font-medium">{formatCurrency(invoice.amount)}</span></div>
+            {amountPaid > 0 && (
+              <div className="flex justify-between"><span className="text-gray-500">Paid</span><span className="font-medium text-green-600">{formatCurrency(amountPaid)}</span></div>
+            )}
+            {invoice.status !== 'PAID' && invoice.status !== 'CANCELLED' && (
+              <div className="flex justify-between"><span className="text-gray-500">Balance Due</span><span className="font-semibold text-red-600">{formatCurrency(balanceDue)}</span></div>
+            )}
             <div className="flex justify-between"><span className="text-gray-500">Status</span><StatusBadge status={invoice.status} /></div>
             <div className="flex justify-between"><span className="text-gray-500">Due</span><span>{formatDate(invoice.dueDate)}</span></div>
           </div>

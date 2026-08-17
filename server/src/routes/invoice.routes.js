@@ -38,6 +38,7 @@ const updateSchema = Joi.object({
 router.get('/', authenticate, authorize(...STAFF_ROLES), controller.list);
 router.post('/', authenticate, authorize(...STAFF_ROLES), validate(createSchema), controller.create);
 router.get('/:id', authenticate, authorize(...STAFF_ROLES), controller.getOne);
+router.get('/:id/download', authenticate, authorize(...STAFF_ROLES), controller.downloadInvoice);
 router.put('/:id', authenticate, authorize(...STAFF_ROLES), validate(updateSchema), controller.update);
 router.post('/:id/send', authenticate, authorize(...STAFF_ROLES), controller.sendInvoice);
 router.post('/:id/remind', authenticate, authorize(...STAFF_ROLES), controller.sendReminder);

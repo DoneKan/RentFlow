@@ -8,8 +8,12 @@ const router = Router();
 
 const createSchema = Joi.object({
   name: Joi.string().min(2).max(100).required(),
-  email: Joi.string().email().lowercase().required(),
-  phone: Joi.string().allow('', null),
+  // Phone is the reliable channel for SMS (reminders, payment
+  // confirmations) so it's required; email stays optional — used for
+  // emailing invoices/receipts and portal login when a tenant has one, but
+  // many landlords never collect it per-tenant.
+  email: Joi.string().email().lowercase().allow('', null),
+  phone: Joi.string().required(),
   unitId: Joi.string().required(),
   startDate: Joi.date().required(),
   endDate: Joi.date().allow(null),

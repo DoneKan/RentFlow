@@ -3,6 +3,7 @@ const ApiResponse = require('../utils/ApiResponse');
 const { generateLeaseAgreement } = require('../utils/pdfGenerator');
 
 const prisma = require('../utils/prisma');
+const { applyTenantDisplay } = require('../utils/tenancyHelpers');
 
 async function loadFullTenancy(tenancyId) {
   return prisma.tenancy.findUnique({
@@ -43,6 +44,7 @@ async function list(req, res, next) {
       },
       orderBy: { createdAt: 'desc' },
     });
+    documents.forEach((d) => applyTenantDisplay(d.tenancy, null));
 
     return ApiResponse.success(res, documents);
   } catch (err) {
@@ -65,6 +67,7 @@ async function getOne(req, res, next) {
       },
     });
     if (!document) throw ApiError.notFound('Lease document not found');
+    applyTenantDisplay(document.tenancy, null);
     return ApiResponse.success(res, document);
   } catch (err) {
     next(err);
@@ -101,6 +104,7 @@ async function download(req, res, next) {
 
     const tenancy = await loadFullTenancy(document.tenancyId);
     if (!tenancy) throw ApiError.notFound('Tenancy not found');
+    applyTenantDisplay(tenancy, null);
 
     const signature = document.signatureDataUrl
       ? { dataUrl: document.signatureDataUrl, signerName: document.signerName, signedAt: document.signedAt }

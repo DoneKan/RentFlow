@@ -3,6 +3,7 @@ import { Check } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useQuery } from '@tanstack/react-query'
 import { useCreateTenant } from '../../hooks/useTenants'
+import NumberInput from '../ui/NumberInput'
 import { getProperties } from '../../services/property.service'
 import { getPropertyUnits } from '../../services/property.service'
 import { PAYMENT_PERIODS } from '../../utils/constants'
@@ -55,7 +56,7 @@ export default function AddTenantForm({ onClose, defaultPropertyId, defaultName,
 
   const validateStep = () => {
     if (step === 0) {
-      if (!form.name || !form.email) { toast.error('Name and email are required'); return false }
+      if (!form.name || !form.phone) { toast.error('Name and phone are required'); return false }
     } else if (step === 1) {
       if (!form.propertyId || !form.unitId) { toast.error('Please select a property and unit'); return false }
     } else if (step === 2) {
@@ -123,12 +124,13 @@ export default function AddTenantForm({ onClose, defaultPropertyId, defaultName,
               <input value={form.name} onChange={(e) => set('name', e.target.value)} className="input" placeholder="Jane Nakato" required />
             </div>
             <div>
-              <label className="label">Email address *</label>
-              <input type="email" value={form.email} onChange={(e) => set('email', e.target.value)} className="input" placeholder="jane@email.com" required />
+              <label className="label">Phone number *</label>
+              <input value={form.phone} onChange={(e) => set('phone', e.target.value)} className="input" placeholder="+256 700 000 000" required />
             </div>
             <div>
-              <label className="label">Phone number</label>
-              <input value={form.phone} onChange={(e) => set('phone', e.target.value)} className="input" placeholder="+256 700 000 000" />
+              <label className="label">Email address <span className="text-gray-400 text-xs">(optional)</span></label>
+              <input type="email" value={form.email} onChange={(e) => set('email', e.target.value)} className="input" placeholder="jane@email.com" />
+              <p className="text-xs text-gray-400 mt-1">Used to email invoices/receipts and for portal login, if provided.</p>
             </div>
           </div>
         )}
@@ -191,11 +193,11 @@ export default function AddTenantForm({ onClose, defaultPropertyId, defaultName,
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="label">Rent amount *</label>
-                <input type="number" value={form.rentAmount} onChange={(e) => set('rentAmount', e.target.value)} className="input" required />
+                <NumberInput value={form.rentAmount} onChange={(v) => set('rentAmount', v)} required />
               </div>
               <div>
                 <label className="label">Deposit</label>
-                <input type="number" value={form.depositAmount} onChange={(e) => set('depositAmount', e.target.value)} className="input" placeholder="0" />
+                <NumberInput value={form.depositAmount} onChange={(v) => set('depositAmount', v)} placeholder="0" />
               </div>
             </div>
 
@@ -224,7 +226,7 @@ export default function AddTenantForm({ onClose, defaultPropertyId, defaultName,
                     ) : (
                       <>
                         <label className="label">Fixed late fee</label>
-                        <input type="number" min="0" value={form.lateFeeFixed} onChange={(e) => set('lateFeeFixed', e.target.value)} className="input" placeholder="50" />
+                        <NumberInput value={form.lateFeeFixed} onChange={(v) => set('lateFeeFixed', v)} placeholder="50" />
                       </>
                     )}
                   </div>
