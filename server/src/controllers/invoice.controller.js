@@ -63,16 +63,19 @@ function buildInvoiceItems(unit, rentAmount = unit.rentAmount) {
 
 async function list(req, res, next) {
   try {
-    const { page = 1, limit = 20, status, propertyId, tenantId } = req.query;
+    const { page = 1, limit = 20, status, propertyId, tenantId, tenancyId } = req.query;
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
     await syncOverdueStatuses(req.user.organizationId);
 
+    // tenancyId scopes to one specific tenancy — the only reliable scope
+    // when a login (tenantId) is shared across multiple tenancies, since
+    // tenantId alone would then match every tenancy on that shared account.
     const where = {
       property: { organizationId: req.user.organizationId },
       ...(status && { status }),
       ...(propertyId && { propertyId }),
-      ...(tenantId && { tenantId }),
+      ...(tenancyId ? { tenancyId } : tenantId && { tenantId }),
     };
 
     const [invoices, total] = await Promise.all([

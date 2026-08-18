@@ -249,7 +249,7 @@ export default function InvoiceDetailPage() {
       </div>
 
       <Modal isOpen={showPayment} onClose={() => setShowPayment(false)} title="Record Payment" size="md">
-        <RecordPaymentForm defaultInvoiceId={id} defaultTenantId={invoice.tenantId} onClose={() => setShowPayment(false)} />
+        <RecordPaymentForm defaultInvoiceId={id} defaultTenancyId={invoice.tenancyId} onClose={() => setShowPayment(false)} />
       </Modal>
     </div>
   )

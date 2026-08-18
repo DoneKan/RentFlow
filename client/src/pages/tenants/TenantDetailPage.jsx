@@ -207,7 +207,7 @@ export default function TenantDetailPage() {
         <GenerateInvoiceForm defaultTenantId={id} onClose={() => setShowInvoice(false)} />
       </Modal>
       <Modal isOpen={showPayment} onClose={() => setShowPayment(false)} title="Record Payment" size="md">
-        <RecordPaymentForm defaultTenantId={id} onClose={() => setShowPayment(false)} />
+        <RecordPaymentForm defaultTenancyId={id} onClose={() => setShowPayment(false)} />
       </Modal>
       <ConfirmDialog
         isOpen={showTerminate}

@@ -8,12 +8,12 @@ import { PAYMENT_METHODS } from '../../utils/constants'
 import { formatCurrency, formatDate } from '../../utils/formatters'
 import NumberInput from '../ui/NumberInput'
 
-export default function RecordPaymentForm({ onClose, defaultTenantId, defaultInvoiceId }) {
+export default function RecordPaymentForm({ onClose, defaultTenancyId, defaultInvoiceId }) {
   const record = useRecordPayment()
   const initiateMtn = useInitiateMTN()
   const initiateAirtel = useInitiateAirtel()
   const [form, setForm] = useState({
-    tenantId: defaultTenantId || '',
+    tenancyId: defaultTenancyId || '',
     invoiceId: defaultInvoiceId || '',
     amount: '',
     method: 'CASH',
@@ -32,16 +32,19 @@ export default function RecordPaymentForm({ onClose, defaultTenantId, defaultInv
   })
 
   const { data: invoicesData } = useQuery({
-    queryKey: ['invoices', { tenantId: form.tenantId, status: 'SENT,OVERDUE' }],
-    queryFn: () => getInvoices({ tenantId: form.tenantId }),
+    // Scoped by tenancyId, not the tenant's login (tenantId) — a login can be
+    // shared across multiple tenancies, and filtering by it would pull in
+    // invoices belonging to a different tenancy on the same shared account.
+    queryKey: ['invoices', { tenancyId: form.tenancyId, status: 'SENT,OVERDUE' }],
+    queryFn: () => getInvoices({ tenancyId: form.tenancyId }),
     select: (r) => (r.data || []).filter((i) => ['SENT', 'OVERDUE'].includes(i.status)),
-    enabled: !!form.tenantId,
+    enabled: !!form.tenancyId,
   })
 
   const selectedInvoice = invoicesData?.find((i) => i.id === form.invoiceId)
 
   const handleTenantChange = (e) => {
-    set('tenantId', e.target.value)
+    set('tenancyId', e.target.value)
     set('invoiceId', '')
     set('amount', '')
   }
@@ -89,15 +92,15 @@ export default function RecordPaymentForm({ onClose, defaultTenantId, defaultInv
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
         <label className="label">Tenant *</label>
-        <select value={form.tenantId} onChange={handleTenantChange} className="input" required>
+        <select value={form.tenancyId} onChange={handleTenantChange} className="input" required>
           <option value="">Select tenant…</option>
           {(tenantsData || []).map((t) => (
-            <option key={t.id} value={t.tenantId}>{t.tenant?.name} — {t.property?.name} Unit {t.unit?.unitNumber}</option>
+            <option key={t.id} value={t.id}>{t.tenant?.name} — {t.property?.name} Unit {t.unit?.unitNumber}</option>
           ))}
         </select>
       </div>
 
-      {form.tenantId && (
+      {form.tenancyId && (
         <div>
           <label className="label">Invoice *</label>
           {!invoicesData?.length ? (
