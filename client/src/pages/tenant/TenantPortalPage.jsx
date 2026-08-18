@@ -202,7 +202,14 @@ function StatementTab({ portal }) {
         </div>
       )}
       {invoices.map((inv) => {
-        const paid = inv.payments?.reduce((s, p) => s + parseFloat(p.amount), 0) || 0
+        // Only COMPLETED payments count as money actually received — a
+        // PENDING mobile-money payment (initiated but not yet confirmed)
+        // must not be counted as paid here.
+        const paid = inv.payments
+          ?.filter((p) => p.status === 'COMPLETED')
+          .reduce((s, p) => s + parseFloat(p.amount), 0) || 0
+        const isSettled = inv.status === 'PAID' || inv.status === 'CANCELLED'
+        const balanceDue = Math.max(parseFloat(inv.amount) - paid, 0)
         return (
           <div key={inv.id} className="bg-white rounded-xl border border-gray-100 p-4 flex items-center justify-between gap-4">
             <div className="flex-1 min-w-0">
@@ -213,10 +220,12 @@ function StatementTab({ portal }) {
               )}
             </div>
             <div className="text-right flex-shrink-0">
-              <p className="font-semibold text-sm">{formatCurrency(inv.amount, currency)}</p>
+              <p className="font-semibold text-sm">{formatCurrency(isSettled ? inv.amount : balanceDue, currency)}</p>
               <StatusBadge status={inv.status} className="mt-1" />
-              {inv.status === 'PAID' && paid > 0 && (
-                <p className="text-xs text-gray-400 mt-0.5">Received: {formatCurrency(paid, currency)}</p>
+              {paid > 0 && (
+                <p className="text-xs text-gray-400 mt-0.5">
+                  {isSettled ? 'Received' : 'Paid so far'}: {formatCurrency(paid, currency)}
+                </p>
               )}
             </div>
           </div>

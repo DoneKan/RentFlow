@@ -77,6 +77,7 @@ async function dashboard(req, res, next) {
           tenancy: { select: { tenantName: true, tenantPhone: true } },
           unit: { select: { unitNumber: true } },
           property: { select: { name: true } },
+          payments: { where: { status: 'COMPLETED' }, select: { amount: true } },
         },
         orderBy: { dueDate: 'asc' },
         take: 10,

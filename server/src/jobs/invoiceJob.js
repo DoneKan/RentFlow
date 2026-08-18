@@ -126,12 +126,17 @@ async function processAutoInvoicing() {
 
       // Snapshot what this tenant already owes from before, so the new
       // draft doesn't land in the queue looking like a routine invoice
-      // when they're actually behind.
-      const priorUnpaidAgg = await prisma.invoice.aggregate({
+      // when they're actually behind. Net of payments already applied to
+      // each prior invoice — a partially-paid one only still owes its
+      // remaining balance, not its full original amount.
+      const priorUnpaidInvoices = await prisma.invoice.findMany({
         where: { tenancyId: tenancy.id, status: { in: ['SENT', 'OVERDUE'] } },
-        _sum: { amount: true },
+        include: { payments: { where: { status: 'COMPLETED' }, select: { amount: true } } },
       });
-      const priorUnpaidAmount = Number(priorUnpaidAgg._sum.amount || 0);
+      const priorUnpaidAmount = priorUnpaidInvoices.reduce((sum, inv) => {
+        const paid = inv.payments.reduce((s, p) => s + Number(p.amount), 0);
+        return sum + Math.max(Number(inv.amount) - paid, 0);
+      }, 0);
 
       let invoiceNumber = generateInvoiceNumber();
       let attempts = 0;

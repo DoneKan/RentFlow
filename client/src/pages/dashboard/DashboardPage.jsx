@@ -265,7 +265,10 @@ export default function DashboardPage() {
             <p className="text-sm text-gray-400 py-4 text-center">No overdue invoices 🎉</p>
           ) : (
             <div className="space-y-3">
-              {overdueInvoices.slice(0, 5).map((inv) => (
+              {overdueInvoices.slice(0, 5).map((inv) => {
+                const paid = (inv.payments || []).reduce((s, p) => s + Number(p.amount), 0)
+                const balanceDue = Math.max(Number(inv.amount) - paid, 0)
+                return (
                 <div key={inv.id} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
                   <div>
                     <p className="text-sm font-medium text-gray-900">{inv.tenant?.name}</p>
@@ -274,7 +277,7 @@ export default function DashboardPage() {
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <p className="text-sm font-semibold text-gray-900">{formatCurrency(inv.amount)}</p>
+                    <p className="text-sm font-semibold text-gray-900">{formatCurrency(balanceDue)}</p>
                     <button
                       onClick={() => handleSendReminder(inv.id)}
                       title="Send reminder"
@@ -284,7 +287,8 @@ export default function DashboardPage() {
                     </button>
                   </div>
                 </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </div>
