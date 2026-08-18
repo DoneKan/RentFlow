@@ -14,3 +14,6 @@ export const getPropertyReport = (id) =>
 
 export const exportReport = (params) =>
   api.get('/reports/export', { params, responseType: 'blob' }).then((r) => r.data)
+
+export const exportFullData = (params) =>
+  api.get('/reports/export-full', { params, responseType: 'blob' }).then((r) => r.data)

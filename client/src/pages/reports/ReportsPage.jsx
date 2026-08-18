@@ -5,7 +5,7 @@ import {
   Building2, LayoutGrid, Percent,
 } from 'lucide-react'
 import {
-  startOfMonth, endOfMonth, subMonths,
+  startOfMonth, endOfMonth,
   startOfQuarter, endOfQuarter,
   startOfYear, endOfYear,
   format,
@@ -19,7 +19,7 @@ import PageHeader from '../../components/ui/PageHeader'
 import StatCard from '../../components/ui/StatCard'
 import DataTable from '../../components/ui/DataTable'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
-import { getFinancialOverview, getFinancialByProperty, exportReport } from '../../services/report.service'
+import { getFinancialOverview, getFinancialByProperty, exportReport, exportFullData } from '../../services/report.service'
 import { formatCurrency } from '../../utils/formatters'
 
 const PIE_COLORS = {
@@ -44,18 +44,24 @@ const CATEGORY_LABELS = {
 
 const RANGE_PRESETS = [
   { key: 'this-month', label: 'This Month' },
-  { key: 'last-month', label: 'Last Month' },
+  { key: 'all-years', label: 'All Years' },
   { key: 'this-quarter', label: 'This Quarter' },
   { key: 'this-year', label: 'This Year' },
 ]
 
+// "All Years" has no real date bound — every report query here filters on
+// a start/end window, so instead of threading a separate unbounded mode
+// through each one, this just picks a window wide enough to be a no-op:
+// before RentFlow could have any data, through far enough ahead to catch
+// future-dated invoices/leases.
+const ALL_YEARS_START = new Date(2000, 0, 1)
+const ALL_YEARS_END = new Date(2100, 11, 31, 23, 59, 59, 999)
+
 function resolvePreset(preset) {
   const now = new Date()
   switch (preset) {
-    case 'last-month': {
-      const d = subMonths(now, 1)
-      return { start: startOfMonth(d), end: endOfMonth(d) }
-    }
+    case 'all-years':
+      return { start: ALL_YEARS_START, end: ALL_YEARS_END }
     case 'this-quarter':
       return { start: startOfQuarter(now), end: endOfQuarter(now) }
     case 'this-year':
@@ -70,6 +76,7 @@ export default function ReportsPage() {
   const [tab, setTab] = useState('overview')
   const [preset, setPreset] = useState('this-month')
   const [exporting, setExporting] = useState(false)
+  const [exportingFull, setExportingFull] = useState(false)
   const [sortKey, setSortKey] = useState('revenue')
   const [sortDir, setSortDir] = useState('desc')
 
@@ -79,6 +86,7 @@ export default function ReportsPage() {
     [start, end]
   )
   const periodLabel = useMemo(() => {
+    if (preset === 'all-years') return 'All Time'
     if (preset === 'this-year') return format(start, 'yyyy')
     if (preset === 'this-quarter') return `${format(start, 'MMM')} – ${format(end, 'MMM yyyy')}`
     return format(start, 'MMMM yyyy')
@@ -147,7 +155,7 @@ export default function ReportsPage() {
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `rentflow-${type}-${params.startDate}.csv`
+      a.download = `rentflow-${type}-${preset === 'all-years' ? 'all-years' : params.startDate}.csv`
       a.click()
       URL.revokeObjectURL(url)
       toast.success('Report exported')
@@ -155,6 +163,25 @@ export default function ReportsPage() {
       toast.error('Export failed')
     } finally {
       setExporting(false)
+    }
+  }
+
+  const handleExportFullData = async () => {
+    setExportingFull(true)
+    try {
+      const data = await exportFullData(params)
+      const blob = new Blob([data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `rentflow-full-data-${preset === 'all-years' ? 'all-years' : params.startDate}.xlsx`
+      a.click()
+      URL.revokeObjectURL(url)
+      toast.success('Full data exported')
+    } catch {
+      toast.error('Export failed')
+    } finally {
+      setExportingFull(false)
     }
   }
 
@@ -193,6 +220,16 @@ export default function ReportsPage() {
           >
             <Download className="h-4 w-4" />
             {exporting ? 'Exporting…' : 'Export CSV'}
+          </button>,
+          <button
+            key="export-full"
+            onClick={handleExportFullData}
+            disabled={exportingFull}
+            title="Every underlying record for the selected period — tenants, payments, invoices, and expenses — as a spreadsheet with one tab per record type"
+            className="btn-secondary flex items-center gap-2"
+          >
+            <Download className="h-4 w-4" />
+            {exportingFull ? 'Exporting…' : 'Export Full Data'}
           </button>,
         ]}
       />

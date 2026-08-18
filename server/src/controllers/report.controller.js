@@ -1,3 +1,4 @@
+const ExcelJS = require('exceljs');
 const ApiError = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
 const { syncOverdueStatuses } = require('../jobs/invoiceJob');
@@ -186,14 +187,18 @@ async function computeOverview(orgId, start, end, propertyId) {
   const collectionRate = invoicedTotal > 0 ? Math.round((revenue / invoicedTotal) * 100) : (revenue > 0 ? 100 : 0);
 
   // Trend window is always the trailing 6 months ending in the selected
-  // range's end month, independent of how wide the selected range itself is.
+  // range's end month, independent of how wide the selected range itself is
+  // — capped at the current month, since a range like "All Years" resolves
+  // to a far-future end date and would otherwise anchor the trend on
+  // months that haven't happened yet (e.g. trailing from Dec 2100).
   // One SUM per month per metric (12 small aggregate queries) instead of
   // pulling every payment/expense row in the whole 6-month window and
   // summing them in JS — Prisma's groupBy can't bucket by a computed
   // month expression portably across Postgres/SQLite, but a fixed 6-month
   // window is small enough that 6 aggregate() calls per metric is cheap
   // and keeps the SUM at the database level.
-  const trendStartMonth = new Date(end.getFullYear(), end.getMonth() - 5, 1);
+  const trendAnchor = end < new Date() ? end : new Date();
+  const trendStartMonth = new Date(trendAnchor.getFullYear(), trendAnchor.getMonth() - 5, 1);
   const trendMonths = Array.from({ length: 6 }, (_, i) => new Date(trendStartMonth.getFullYear(), trendStartMonth.getMonth() + i, 1));
 
   const trend = await Promise.all(trendMonths.map(async (monthStartDate) => {
@@ -573,6 +578,193 @@ async function exportReport(req, res, next) {
   }
 }
 
+function styleHeaderRow(sheet) {
+  sheet.getRow(1).font = { bold: true };
+  sheet.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: sheet.columns.length } };
+}
+
+// Full raw-record export — the detail-level counterpart to exportReport's
+// aggregated CSV. Tenants are a roster (not period-scoped: a lease that
+// started outside the selected window is still a real tenant right now),
+// while Payments/Invoices/Expenses are scoped to the selected period, same
+// as every other report on this page.
+async function exportFullData(req, res, next) {
+  try {
+    const orgId = req.user.organizationId;
+    const { start, end } = resolveRange(req.query);
+
+    const [tenancies, payments, invoices, expenses] = await Promise.all([
+      prisma.tenancy.findMany({
+        where: { property: { organizationId: orgId } },
+        include: {
+          tenant: { select: { name: true, email: true, phone: true } },
+          unit: { select: { unitNumber: true } },
+          property: { select: { name: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.payment.findMany({
+        where: {
+          invoice: { property: { organizationId: orgId } },
+          status: 'COMPLETED',
+          paidAt: { gte: start, lte: end },
+        },
+        include: {
+          tenant: { select: { name: true } },
+          invoice: {
+            select: {
+              invoiceNumber: true,
+              tenancy: { select: { tenantName: true, tenantPhone: true } },
+              unit: { select: { unitNumber: true } },
+              property: { select: { name: true } },
+            },
+          },
+        },
+        orderBy: { paidAt: 'desc' },
+      }),
+      prisma.invoice.findMany({
+        where: { property: { organizationId: orgId }, dueDate: { gte: start, lte: end } },
+        include: {
+          tenant: { select: { name: true } },
+          tenancy: { select: { tenantName: true, tenantPhone: true } },
+          unit: { select: { unitNumber: true } },
+          property: { select: { name: true } },
+          payments: { where: { status: 'COMPLETED' }, select: { amount: true } },
+        },
+        orderBy: { dueDate: 'desc' },
+      }),
+      prisma.expense.findMany({
+        where: { property: { organizationId: orgId }, date: { gte: start, lte: end } },
+        include: { property: { select: { name: true } } },
+        orderBy: { date: 'desc' },
+      }),
+    ]);
+
+    applyTenantDisplayAll(tenancies, null);
+    applyTenantDisplayAll(payments, 'invoice.tenancy');
+    applyTenantDisplayAll(invoices);
+
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'RentFlow';
+    workbook.created = new Date();
+
+    const tenantsSheet = workbook.addWorksheet('Tenants');
+    tenantsSheet.columns = [
+      { header: 'Name', key: 'name', width: 24 },
+      { header: 'Phone', key: 'phone', width: 16 },
+      { header: 'Email', key: 'email', width: 28 },
+      { header: 'Property', key: 'property', width: 22 },
+      { header: 'Unit', key: 'unit', width: 10 },
+      { header: 'Rent Amount', key: 'rent', width: 14 },
+      { header: 'Deposit', key: 'deposit', width: 14 },
+      { header: 'Status', key: 'status', width: 12 },
+      { header: 'Move-in Date', key: 'startDate', width: 14 },
+      { header: 'Move-out Date', key: 'endDate', width: 14 },
+    ];
+    for (const t of tenancies) {
+      tenantsSheet.addRow({
+        name: t.tenant?.name || '',
+        phone: t.tenant?.phone || '',
+        email: t.tenant?.email || '',
+        property: t.property?.name || '',
+        unit: t.unit?.unitNumber || '',
+        rent: Number(t.rentAmount),
+        deposit: Number(t.depositAmount),
+        status: t.status,
+        startDate: t.startDate ? t.startDate.toISOString().slice(0, 10) : '',
+        endDate: t.endDate ? t.endDate.toISOString().slice(0, 10) : '',
+      });
+    }
+    tenantsSheet.getColumn('rent').numFmt = '#,##0';
+    tenantsSheet.getColumn('deposit').numFmt = '#,##0';
+    styleHeaderRow(tenantsSheet);
+
+    const paymentsSheet = workbook.addWorksheet('Payments');
+    paymentsSheet.columns = [
+      { header: 'Receipt No', key: 'receiptNumber', width: 18 },
+      { header: 'Date Paid', key: 'paidAt', width: 14 },
+      { header: 'Tenant', key: 'tenant', width: 24 },
+      { header: 'Property', key: 'property', width: 22 },
+      { header: 'Unit', key: 'unit', width: 10 },
+      { header: 'Invoice No', key: 'invoiceNumber', width: 18 },
+      { header: 'Amount', key: 'amount', width: 14 },
+      { header: 'Method', key: 'method', width: 14 },
+    ];
+    for (const p of payments) {
+      paymentsSheet.addRow({
+        receiptNumber: p.receiptNumber || '',
+        paidAt: p.paidAt ? p.paidAt.toISOString().slice(0, 10) : '',
+        tenant: p.tenant?.name || '',
+        property: p.invoice?.property?.name || '',
+        unit: p.invoice?.unit?.unitNumber || '',
+        invoiceNumber: p.invoice?.invoiceNumber || '',
+        amount: Number(p.amount),
+        method: p.method,
+      });
+    }
+    paymentsSheet.getColumn('amount').numFmt = '#,##0';
+    styleHeaderRow(paymentsSheet);
+
+    const invoicesSheet = workbook.addWorksheet('Invoices');
+    invoicesSheet.columns = [
+      { header: 'Invoice No', key: 'invoiceNumber', width: 18 },
+      { header: 'Tenant', key: 'tenant', width: 24 },
+      { header: 'Property', key: 'property', width: 22 },
+      { header: 'Unit', key: 'unit', width: 10 },
+      { header: 'Amount', key: 'amount', width: 14 },
+      { header: 'Paid', key: 'paid', width: 14 },
+      { header: 'Balance Due', key: 'balance', width: 14 },
+      { header: 'Status', key: 'status', width: 12 },
+      { header: 'Due Date', key: 'dueDate', width: 14 },
+    ];
+    for (const inv of invoices) {
+      const paidSum = (inv.payments || []).reduce((s, p) => s + Number(p.amount), 0);
+      invoicesSheet.addRow({
+        invoiceNumber: inv.invoiceNumber,
+        tenant: inv.tenant?.name || '',
+        property: inv.property?.name || '',
+        unit: inv.unit?.unitNumber || '',
+        amount: Number(inv.amount),
+        paid: paidSum,
+        balance: Math.max(Number(inv.amount) - paidSum, 0),
+        status: inv.status,
+        dueDate: inv.dueDate ? inv.dueDate.toISOString().slice(0, 10) : '',
+      });
+    }
+    ['amount', 'paid', 'balance'].forEach((k) => { invoicesSheet.getColumn(k).numFmt = '#,##0'; });
+    styleHeaderRow(invoicesSheet);
+
+    const expensesSheet = workbook.addWorksheet('Expenses');
+    expensesSheet.columns = [
+      { header: 'Date', key: 'date', width: 14 },
+      { header: 'Property', key: 'property', width: 22 },
+      { header: 'Category', key: 'category', width: 18 },
+      { header: 'Amount', key: 'amount', width: 14 },
+      { header: 'Vendor', key: 'vendor', width: 20 },
+      { header: 'Description', key: 'description', width: 30 },
+    ];
+    for (const e of expenses) {
+      expensesSheet.addRow({
+        date: e.date ? e.date.toISOString().slice(0, 10) : '',
+        property: e.property?.name || '',
+        category: e.category,
+        amount: Number(e.amount),
+        vendor: e.vendor || '',
+        description: e.description || '',
+      });
+    }
+    expensesSheet.getColumn('amount').numFmt = '#,##0';
+    styleHeaderRow(expensesSheet);
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename="rentflow-full-data-export.xlsx"');
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (err) {
+    next(err);
+  }
+}
+
 const PLAN_LIMITS = {
   FREE:       { units: 5,   properties: 1,  label: 'Starter' },
   STARTER:    { units: 5,   properties: 1,  label: 'Starter' },
@@ -619,5 +811,6 @@ module.exports = {
   financialByProperty,
   propertyReport,
   exportReport,
+  exportFullData,
   subscription,
 };
