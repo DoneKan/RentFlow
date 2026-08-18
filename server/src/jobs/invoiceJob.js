@@ -31,34 +31,93 @@ function periodMonths(paymentPeriod) {
   }
 }
 
-// Returns the most recent due date on or before `referenceDate` for a
-// tenancy that started on `startDate` and bills every `paymentPeriod`.
-function getNextDueDate(startDate, paymentPeriod, referenceDate = new Date()) {
-  const start = new Date(startDate);
-  const today = new Date(referenceDate);
-  const months = periodMonths(paymentPeriod);
-
-  let periodsElapsed = 0;
-  while (addMonthsFromAnchor(start, (periodsElapsed + 1) * months) <= today) {
-    periodsElapsed++;
-  }
-  return addMonthsFromAnchor(start, periodsElapsed * months);
-}
-
 function monthKey(date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
 }
 
-function isSameDayOfMonth(date1, date2) {
-  return date1.getDate() === date2.getDate() &&
-    date1.getMonth() === date2.getMonth() &&
-    date1.getFullYear() === date2.getFullYear();
-}
+// A safety cap on how many billing periods of backlog a single tenancy can
+// catch up in one run — real recovery from a long-dead cron should still
+// terminate quickly rather than mass-generate years of drafts from a bad
+// startDate.
+const MAX_BACKLOG_PERIODS = 36;
 
-function isDayAfter(date1, date2) {
-  const dayAfter = new Date(date1);
-  dayAfter.setDate(dayAfter.getDate() + 1);
-  return isSameDayOfMonth(dayAfter, date2);
+async function createDraftForPeriod(tenancy, dueDate, billingPeriod) {
+  // Fast pre-check to skip the common case cheaply; the
+  // (tenancyId, billingPeriod) unique constraint on Invoice is the
+  // actual idempotency guarantee below, in case two runs race past
+  // this check at the same time (e.g. a manual trigger overlapping
+  // the scheduled one, or a backlog catch-up overlapping a live cron).
+  const existing = await prisma.invoice.findFirst({
+    where: { tenancyId: tenancy.id, billingPeriod },
+  });
+  if (existing) {
+    logger.info(`[InvoiceJob] Draft already exists for tenancy ${tenancy.id}, period ${billingPeriod}, skipping`);
+    return;
+  }
+
+  // Current rent, read fresh off the tenancy right now — not the unit's
+  // default listed rate, which can differ from what this specific tenant
+  // is actually paying (a negotiated rate, or a rent change applied after
+  // the lease started via the tenancy update endpoint).
+  const unit = tenancy.unit;
+  const charges = typeof unit.additionalCharges === 'string'
+    ? JSON.parse(unit.additionalCharges || '{}')
+    : (unit.additionalCharges || {});
+  const items = [
+    { description: `Rent — ${unit.type} Unit ${unit.unitNumber}`, amount: Number(tenancy.rentAmount), type: 'rent' },
+  ];
+  if (charges.utilities) items.push({ description: 'Utilities', amount: Number(charges.utilities), type: 'charge' });
+  if (charges.security) items.push({ description: 'Security', amount: Number(charges.security), type: 'charge' });
+  if (charges.garbage) items.push({ description: 'Garbage Collection', amount: Number(charges.garbage), type: 'charge' });
+
+  const total = items.reduce((s, i) => s + i.amount, 0);
+
+  // Snapshot what this tenant already owes from before, so the new draft
+  // doesn't land in the queue looking like a routine invoice when they're
+  // actually behind. Net of payments already applied to each prior
+  // invoice — a partially-paid one only still owes its remaining balance,
+  // not its full original amount.
+  const priorUnpaidInvoices = await prisma.invoice.findMany({
+    where: { tenancyId: tenancy.id, status: { in: ['SENT', 'OVERDUE'] } },
+    include: { payments: { where: { status: 'COMPLETED' }, select: { amount: true } } },
+  });
+  const priorUnpaidAmount = priorUnpaidInvoices.reduce((sum, inv) => {
+    const paid = inv.payments.reduce((s, p) => s + Number(p.amount), 0);
+    return sum + Math.max(Number(inv.amount) - paid, 0);
+  }, 0);
+
+  let invoiceNumber = generateInvoiceNumber();
+  let attempts = 0;
+  while (await prisma.invoice.findUnique({ where: { invoiceNumber } }) && attempts < 10) {
+    invoiceNumber = generateInvoiceNumber();
+    attempts++;
+  }
+
+  try {
+    const invoice = await prisma.invoice.create({
+      data: {
+        invoiceNumber,
+        tenancyId: tenancy.id,
+        unitId: tenancy.unitId,
+        propertyId: tenancy.propertyId,
+        tenantId: tenancy.tenantId,
+        amount: total,
+        dueDate,
+        items: JSON.stringify(items),
+        status: 'DRAFT',
+        billingPeriod,
+        priorUnpaidAmount,
+      },
+    });
+
+    logger.info(`[InvoiceJob] Draft invoice ${invoice.invoiceNumber} created for ${tenancy.tenant.email}, period ${billingPeriod}, pending review${priorUnpaidAmount > 0 ? ` (tenant has ${priorUnpaidAmount} outstanding from before)` : ''}`);
+  } catch (err) {
+    if (err.code === 'P2002') {
+      logger.info(`[InvoiceJob] Draft for tenancy ${tenancy.id}, period ${billingPeriod} was created by a concurrent run, skipping`);
+    } else {
+      throw err;
+    }
+  }
 }
 
 // Drafts a rent invoice one day after each active tenancy's billing day —
@@ -66,6 +125,18 @@ function isDayAfter(date1, date2) {
 // edit line items on, and explicitly send (or cancel). This never emails a
 // tenant or a PDF on its own; that only happens via invoice.controller's
 // sendInvoice, triggered by a human clicking Send.
+//
+// Walks every billing period from the tenancy's start through the most
+// recent one that's actually reached its draft-eligible day, not just the
+// single latest period — the previous version only ever checked "is today
+// exactly the day after the current due date", an exact-day match with no
+// catch-up. If the cron didn't run (or wasn't deployed, or errored) on
+// that one specific day, that period's invoice was lost forever with no
+// way to notice later. This version self-heals like syncOverdueStatuses/
+// syncEndedTenancies: run it any time, any number of days late, and every
+// genuinely missed period still gets its draft, while anything already
+// invoiced is skipped via the same (tenancyId, billingPeriod) idempotency
+// check as before.
 async function processAutoInvoicing() {
   logger.info('[InvoiceJob] Running auto-invoicing check...');
   const today = new Date();
@@ -74,101 +145,37 @@ async function processAutoInvoicing() {
     // Tenancies with an ended lease (a turned-over unit) never bill again —
     // status flips to TERMINATED via the terminate endpoint, which this
     // excludes. A fixed-term lease whose endDate has passed but hasn't been
-    // operationally terminated yet is handled per-tenancy below, since
-    // whether it's "ended before the billing date" depends on the billing
-    // date, which is only known once computed for that specific tenancy.
+    // operationally terminated yet is handled per-period below, since
+    // whether a given period is "after the lease ended" depends on that
+    // period's own due date.
     const activeTenancies = await prisma.tenancy.findMany({
       where: { status: 'ACTIVE' },
       include: { unit: true, tenant: true, property: true },
     });
 
     for (const tenancy of activeTenancies) {
-      const dueDate = getNextDueDate(tenancy.startDate, tenancy.unit.paymentPeriod, today);
+      const months = periodMonths(tenancy.unit.paymentPeriod);
 
-      if (tenancy.endDate && tenancy.endDate < dueDate) {
-        logger.info(`[InvoiceJob] Tenancy ${tenancy.id} ended before this billing date, skipping`);
-        continue;
-      }
-      if (!isDayAfter(dueDate, today)) continue;
+      let periodIndex = 0;
+      let dueDate = new Date(tenancy.startDate);
+      while (periodIndex < MAX_BACKLOG_PERIODS && dueDate <= today) {
+        const draftEligibleDay = new Date(dueDate);
+        draftEligibleDay.setDate(draftEligibleDay.getDate() + 1);
 
-      const billingPeriod = monthKey(dueDate);
+        if (draftEligibleDay > today) break; // this and every later period aren't due for a draft yet
 
-      // Fast pre-check to skip the common case cheaply; the
-      // (tenancyId, billingPeriod) unique constraint on Invoice is the
-      // actual idempotency guarantee below, in case two runs race past
-      // this check at the same time (e.g. a manual trigger overlapping
-      // the scheduled one).
-      const existing = await prisma.invoice.findFirst({
-        where: { tenancyId: tenancy.id, billingPeriod },
-      });
-      if (existing) {
-        logger.info(`[InvoiceJob] Draft already exists for tenancy ${tenancy.id}, period ${billingPeriod}, skipping`);
-        continue;
-      }
-
-      // Current rent, read fresh off the tenancy right now — not the
-      // unit's default listed rate, which can differ from what this
-      // specific tenant is actually paying (a negotiated rate, or a rent
-      // change applied after the lease started via the tenancy update
-      // endpoint).
-      const unit = tenancy.unit;
-      const charges = typeof unit.additionalCharges === 'string'
-        ? JSON.parse(unit.additionalCharges || '{}')
-        : (unit.additionalCharges || {});
-      const items = [
-        { description: `Rent — ${unit.type} Unit ${unit.unitNumber}`, amount: Number(tenancy.rentAmount), type: 'rent' },
-      ];
-      if (charges.utilities) items.push({ description: 'Utilities', amount: Number(charges.utilities), type: 'charge' });
-      if (charges.security) items.push({ description: 'Security', amount: Number(charges.security), type: 'charge' });
-      if (charges.garbage) items.push({ description: 'Garbage Collection', amount: Number(charges.garbage), type: 'charge' });
-
-      const total = items.reduce((s, i) => s + i.amount, 0);
-
-      // Snapshot what this tenant already owes from before, so the new
-      // draft doesn't land in the queue looking like a routine invoice
-      // when they're actually behind. Net of payments already applied to
-      // each prior invoice — a partially-paid one only still owes its
-      // remaining balance, not its full original amount.
-      const priorUnpaidInvoices = await prisma.invoice.findMany({
-        where: { tenancyId: tenancy.id, status: { in: ['SENT', 'OVERDUE'] } },
-        include: { payments: { where: { status: 'COMPLETED' }, select: { amount: true } } },
-      });
-      const priorUnpaidAmount = priorUnpaidInvoices.reduce((sum, inv) => {
-        const paid = inv.payments.reduce((s, p) => s + Number(p.amount), 0);
-        return sum + Math.max(Number(inv.amount) - paid, 0);
-      }, 0);
-
-      let invoiceNumber = generateInvoiceNumber();
-      let attempts = 0;
-      while (await prisma.invoice.findUnique({ where: { invoiceNumber } }) && attempts < 10) {
-        invoiceNumber = generateInvoiceNumber();
-        attempts++;
-      }
-
-      try {
-        const invoice = await prisma.invoice.create({
-          data: {
-            invoiceNumber,
-            tenancyId: tenancy.id,
-            unitId: tenancy.unitId,
-            propertyId: tenancy.propertyId,
-            tenantId: tenancy.tenantId,
-            amount: total,
-            dueDate,
-            items: JSON.stringify(items),
-            status: 'DRAFT',
-            billingPeriod,
-            priorUnpaidAmount,
-          },
-        });
-
-        logger.info(`[InvoiceJob] Draft invoice ${invoice.invoiceNumber} created for ${tenancy.tenant.email}, pending review${priorUnpaidAmount > 0 ? ` (tenant has ${priorUnpaidAmount} outstanding from before)` : ''}`);
-      } catch (err) {
-        if (err.code === 'P2002') {
-          logger.info(`[InvoiceJob] Draft for tenancy ${tenancy.id}, period ${billingPeriod} was created by a concurrent run, skipping`);
-        } else {
-          throw err;
+        if (tenancy.endDate && tenancy.endDate < dueDate) {
+          logger.info(`[InvoiceJob] Tenancy ${tenancy.id} ended before billing date ${monthKey(dueDate)}, stopping backlog walk here`);
+          break; // lease ended at or before this period — nothing here or later is owed
         }
+
+        await createDraftForPeriod(tenancy, dueDate, monthKey(dueDate));
+
+        periodIndex++;
+        dueDate = addMonthsFromAnchor(tenancy.startDate, periodIndex * months);
+      }
+      if (periodIndex >= MAX_BACKLOG_PERIODS) {
+        logger.warn(`[InvoiceJob] Tenancy ${tenancy.id} hit the ${MAX_BACKLOG_PERIODS}-period backlog cap — check its startDate/endDate for a data issue`);
       }
     }
 

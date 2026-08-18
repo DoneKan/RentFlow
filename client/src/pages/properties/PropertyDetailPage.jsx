@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Edit2, Building2, MapPin, Pencil, Plus, UserPlus, Wrench, Trash2 } from 'lucide-react'
+import { ArrowLeft, Building2, MapPin, Pencil, Plus, UserPlus, Wrench, Trash2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useProperty, usePropertyUnits, useDeleteProperty } from '../../hooks/useProperties'
 import { formatCurrency } from '../../utils/formatters'
@@ -10,6 +10,7 @@ import Modal from '../../components/ui/Modal'
 import ConfirmDialog from '../../components/ui/ConfirmDialog'
 import AddUnitForm from '../../components/forms/AddUnitForm'
 import AddTenantForm from '../../components/forms/AddTenantForm'
+import EditPropertyForm from '../../components/forms/EditPropertyForm'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import EmptyState from '../../components/ui/EmptyState'
 import { useExpenses } from '../../hooks/useExpenses'
@@ -35,6 +36,7 @@ export default function PropertyDetailPage() {
   const [selectedUnitId, setSelectedUnitId] = useState(null)
   const [showAddExpense, setShowAddExpense] = useState(false)
   const [showDelete, setShowDelete] = useState(false)
+  const [showEdit, setShowEdit] = useState(false)
   const [historyUnit, setHistoryUnit] = useState(null)
 
   const deleteProperty = useDeleteProperty()
@@ -124,6 +126,12 @@ export default function PropertyDetailPage() {
             {property.address}, {property.city}
           </div>
         </div>
+        <button
+          onClick={() => setShowEdit(true)}
+          className="flex items-center gap-1.5 text-sm text-brand hover:bg-brand/5 px-3 py-1.5 rounded-lg"
+        >
+          <Pencil className="h-4 w-4" /> Edit
+        </button>
         <button
           onClick={() => setShowDelete(true)}
           className="flex items-center gap-1.5 text-sm text-red-500 hover:bg-red-50 px-3 py-1.5 rounded-lg"
@@ -234,6 +242,10 @@ export default function PropertyDetailPage() {
           ))}
         </div>
       )}
+
+      <Modal isOpen={showEdit} onClose={() => setShowEdit(false)} title="Edit Property" size="lg">
+        <EditPropertyForm property={property} onClose={() => setShowEdit(false)} />
+      </Modal>
 
       <Modal isOpen={showAddUnit} onClose={() => setShowAddUnit(false)} title="Add Unit" size="lg">
         <AddUnitForm propertyId={id} onClose={() => setShowAddUnit(false)} />
