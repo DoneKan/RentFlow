@@ -1,7 +1,7 @@
 const ExcelJS = require('exceljs');
 const ApiError = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
-const { syncOverdueStatuses } = require('../jobs/invoiceJob');
+const { syncOverdueStatuses, syncEndedTenancies } = require('../jobs/invoiceJob');
 const { attachCurrentTenancy, applyTenantDisplayAll } = require('../utils/tenancyHelpers');
 const { getCompletedPaymentTotalsByProperty, getOutstandingBalance, getOutstandingBalanceByProperty } = require('../utils/paymentAggregates');
 
@@ -42,6 +42,7 @@ async function dashboard(req, res, next) {
     const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
 
     await syncOverdueStatuses(orgId);
+    await syncEndedTenancies(orgId);
 
     const propertyFilter = propertyId ? { propertyId } : {};
 
@@ -376,6 +377,7 @@ async function financialByProperty(req, res, next) {
   try {
     const orgId = req.user.organizationId;
     const { start, end } = resolveRange(req.query);
+    await syncEndedTenancies(orgId);
     const data = await computeByProperty(orgId, start, end);
     return ApiResponse.success(res, data);
   } catch (err) {
@@ -392,6 +394,8 @@ async function propertyReport(req, res, next) {
       where: { id, organizationId: req.user.organizationId },
     });
     if (!property) throw ApiError.notFound('Property not found');
+
+    await syncEndedTenancies(req.user.organizationId);
 
     const m = parseInt(month) || new Date().getMonth() + 1;
     const y = parseInt(year) || new Date().getFullYear();
@@ -480,6 +484,8 @@ async function exportReport(req, res, next) {
     const { start, end } = resolveRange(req.query);
     const y = parseInt(year) || new Date().getFullYear();
     const m = parseInt(month) || new Date().getMonth() + 1;
+
+    await syncEndedTenancies(orgId);
 
     if (type === 'overall') {
       const data = await computeOverview(orgId, start, end);
@@ -592,6 +598,8 @@ async function exportFullData(req, res, next) {
   try {
     const orgId = req.user.organizationId;
     const { start, end } = resolveRange(req.query);
+
+    await syncEndedTenancies(orgId);
 
     const [tenancies, payments, invoices, expenses] = await Promise.all([
       prisma.tenancy.findMany({

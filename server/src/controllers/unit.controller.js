@@ -1,6 +1,7 @@
 const ApiError = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
 const { attachCurrentTenancy } = require('../utils/tenancyHelpers');
+const { syncEndedTenancies } = require('../jobs/invoiceJob');
 
 const prisma = require('../utils/prisma');
 
@@ -22,6 +23,8 @@ function parseUnit(unit) {
 async function list(req, res, next) {
   try {
     const { status, propertyId } = req.query;
+
+    await syncEndedTenancies(req.user.organizationId);
 
     const units = await prisma.unit.findMany({
       where: {
@@ -79,6 +82,8 @@ async function create(req, res, next) {
 
 async function getOne(req, res, next) {
   try {
+    await syncEndedTenancies(req.user.organizationId);
+
     const unit = await prisma.unit.findFirst({
       where: {
         id: req.params.id,

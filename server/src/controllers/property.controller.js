@@ -3,6 +3,7 @@ const ApiResponse = require('../utils/ApiResponse');
 const { generatePropertyCode } = require('../utils/generateCode');
 const { attachCurrentTenancy } = require('../utils/tenancyHelpers');
 const { getCompletedPaymentTotalsByProperty } = require('../utils/paymentAggregates');
+const { syncEndedTenancies } = require('../jobs/invoiceJob');
 
 const prisma = require('../utils/prisma');
 
@@ -30,6 +31,8 @@ async function list(req, res, next) {
   try {
     const { page = 1, limit = 20 } = req.query;
     const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    await syncEndedTenancies(req.user.organizationId);
 
     const where = { organizationId: req.user.organizationId, isActive: true };
 
@@ -141,6 +144,8 @@ async function getVacant(req, res, next) {
 
 async function getOne(req, res, next) {
   try {
+    await syncEndedTenancies(req.user.organizationId);
+
     const property = await prisma.property.findFirst({
       where: { id: req.params.id, organizationId: req.user.organizationId },
       include: {

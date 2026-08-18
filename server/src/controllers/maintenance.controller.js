@@ -3,6 +3,7 @@ const ApiResponse = require('../utils/ApiResponse');
 
 const prisma = require('../utils/prisma');
 const { applyTenantDisplay, applyTenantDisplayAll } = require('../utils/tenancyHelpers');
+const { syncEndedTenancies } = require('../jobs/invoiceJob');
 
 async function list(req, res, next) {
   try {
@@ -79,6 +80,8 @@ async function create(req, res, next) {
     const isTenant = req.user.role === 'TENANT';
 
     if (!title || !description) throw ApiError.badRequest('Title and description are required');
+
+    await syncEndedTenancies(req.user.organizationId);
 
     let tenancy;
     if (isTenant) {

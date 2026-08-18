@@ -217,14 +217,30 @@ async function processOverdueInvoices() {
   }
 }
 
+async function processEndedTenancies() {
+  logger.info('[InvoiceJob] Checking for lapsed tenancies...');
+  try {
+    const ended = await endLapsedTenancies({});
+    logger.info(`[InvoiceJob] Ended ${ended.length} lapsed tenanc${ended.length === 1 ? 'y' : 'ies'}`);
+  } catch (err) {
+    logger.error('[InvoiceJob] Lapsed tenancy check failed:', err);
+  }
+}
+
 function initializeJobs() {
+  // Lapsed-tenancy check daily at 7 AM EAT, ahead of auto-invoicing —
+  // belt-and-suspenders, since processAutoInvoicing already independently
+  // skips any tenancy whose endDate has passed the computed billing date
+  // regardless of status.
+  cron.schedule('0 4 * * *', processEndedTenancies, { timezone: 'Africa/Nairobi' });
+
   // Auto-invoice daily at 8 AM EAT (UTC+3)
   cron.schedule('0 5 * * *', processAutoInvoicing, { timezone: 'Africa/Nairobi' });
 
   // Overdue check daily at 9 AM EAT
   cron.schedule('0 6 * * *', processOverdueInvoices, { timezone: 'Africa/Nairobi' });
 
-  logger.info('[InvoiceJob] Cron jobs initialized (auto-invoice @ 8 AM, overdue @ 9 AM EAT)');
+  logger.info('[InvoiceJob] Cron jobs initialized (lapsed-tenancy @ 7 AM, auto-invoice @ 8 AM, overdue @ 9 AM EAT)');
 }
 
 // A SENT invoice only becomes OVERDUE once the daily cron runs, so any read
@@ -243,4 +259,48 @@ async function syncOverdueStatuses(organizationId) {
   });
 }
 
-module.exports = { initializeJobs, processAutoInvoicing, processOverdueInvoices, syncOverdueStatuses };
+// Ends any ACTIVE tenancy whose fixed-term lease has already passed its End
+// Date but hasn't been operationally terminated — the same transition
+// tenant.controller.js's terminate() makes when a human clicks "Terminate
+// Tenancy", just triggered by the date instead of a click. Deliberately
+// does NOT touch endDate (it's already set — that's the trigger) or delete/
+// reassign anything, so every invoice/payment/maintenance record already
+// attached to this tenancy stays exactly where it is; only status flips,
+// same as the manual path.
+async function endLapsedTenancies(scopeWhere) {
+  const lapsed = await prisma.tenancy.findMany({
+    where: { status: 'ACTIVE', endDate: { lt: new Date() }, ...scopeWhere },
+    select: { id: true, unitId: true },
+  });
+  if (lapsed.length === 0) return [];
+
+  await prisma.$transaction([
+    prisma.tenancy.updateMany({
+      where: { id: { in: lapsed.map((t) => t.id) } },
+      data: { status: 'TERMINATED' },
+    }),
+    prisma.unit.updateMany({
+      where: { id: { in: lapsed.map((t) => t.unitId) } },
+      data: { status: 'VACANT' },
+    }),
+  ]);
+  return lapsed;
+}
+
+// Call at the top of any read path that depends on Tenancy.status ===
+// 'ACTIVE' or Unit.status === 'OCCUPIED' — occupancy figures, the Tenants
+// list, invoice generation eligibility, tenant/owner portals — scoped to
+// the caller's org, no logging, same shape and same reason as
+// syncOverdueStatuses: don't wait on the cron for a read to be correct.
+async function syncEndedTenancies(organizationId) {
+  await endLapsedTenancies({ property: { organizationId } });
+}
+
+module.exports = {
+  initializeJobs,
+  processAutoInvoicing,
+  processOverdueInvoices,
+  syncOverdueStatuses,
+  processEndedTenancies,
+  syncEndedTenancies,
+};

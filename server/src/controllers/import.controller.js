@@ -4,6 +4,7 @@ const logger = require('../utils/logger');
 const prisma = require('../utils/prisma');
 const { getImporter } = require('../services/import/registry');
 const { toCsv, parseImportCsv } = require('../services/import/csvUtils');
+const { syncEndedTenancies } = require('../jobs/invoiceJob');
 
 function requireImporter(req) {
   const importer = getImporter(req.params.entityType);
@@ -77,6 +78,12 @@ async function validateUpload(req, res, next) {
         message: 'No data rows found in this file — nothing to import.',
       }, 'File parsed');
     }
+
+    // Tenancies/Invoices importers key off Unit.status / Tenancy.status
+    // ('VACANT' unit lookup, each unit's ACTIVE tenancy) — sync first so a
+    // lapsed-but-not-yet-transitioned tenancy doesn't block a unit from
+    // looking vacant, or get treated as this unit's still-current tenant.
+    await syncEndedTenancies(req.user.organizationId);
 
     // Entities with a foreign-key lookup column (e.g. Units resolving a
     // "Property Name" to a propertyId) fetch the lookup table once here,

@@ -3,7 +3,7 @@ const ApiResponse = require('../utils/ApiResponse');
 const { generateInvoiceNumber } = require('../utils/generateCode');
 const { generateInvoice } = require('../utils/pdfGenerator');
 const { sendInvoiceEmail, sendRentReminder, sendDemandNotice } = require('../utils/emailService');
-const { syncOverdueStatuses } = require('../jobs/invoiceJob');
+const { syncOverdueStatuses, syncEndedTenancies } = require('../jobs/invoiceJob');
 const logger = require('../utils/logger');
 
 const prisma = require('../utils/prisma');
@@ -111,6 +111,8 @@ async function list(req, res, next) {
 async function create(req, res, next) {
   try {
     const { tenancyId, dueDate, latePenalty, customItems, notes } = req.body;
+
+    await syncEndedTenancies(req.user.organizationId);
 
     const tenancy = await prisma.tenancy.findFirst({
       where: {

@@ -6,11 +6,14 @@ const logger = require('../utils/logger');
 
 const prisma = require('../utils/prisma');
 const { applyTenantDisplay, applyTenantDisplayAll } = require('../utils/tenancyHelpers');
+const { syncEndedTenancies } = require('../jobs/invoiceJob');
 
 async function list(req, res, next) {
   try {
     const { page = 1, limit = 20, propertyId, status = 'ACTIVE' } = req.query;
     const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    await syncEndedTenancies(req.user.organizationId);
 
     const [tenancies, total] = await Promise.all([
       prisma.tenancy.findMany({
@@ -63,6 +66,11 @@ async function create(req, res, next) {
       depositAmount,
       notes,
     } = req.body;
+
+    // A unit whose previous tenancy has already passed its End Date should
+    // read as vacant here, not still blocked by a lapsed-but-not-yet-synced
+    // ACTIVE tenancy.
+    await syncEndedTenancies(req.user.organizationId);
 
     const unit = await prisma.unit.findFirst({
       where: {
@@ -143,6 +151,8 @@ async function create(req, res, next) {
 
 async function getOne(req, res, next) {
   try {
+    await syncEndedTenancies(req.user.organizationId);
+
     const tenancy = await prisma.tenancy.findFirst({
       where: {
         id: req.params.id,
@@ -219,6 +229,11 @@ async function update(req, res, next) {
 
 async function terminate(req, res, next) {
   try {
+    // Sync first — if this tenancy's own End Date already passed, it should
+    // read as already-ended (and error out below) rather than let a manual
+    // Terminate race the automatic transition.
+    await syncEndedTenancies(req.user.organizationId);
+
     const tenancy = await prisma.tenancy.findFirst({
       where: {
         id: req.params.id,
@@ -247,6 +262,8 @@ async function terminate(req, res, next) {
 
 async function getMyPortal(req, res, next) {
   try {
+    await syncEndedTenancies(req.user.organizationId);
+
     const tenancy = await prisma.tenancy.findFirst({
       where: { tenantId: req.user.id, status: 'ACTIVE' },
       include: {

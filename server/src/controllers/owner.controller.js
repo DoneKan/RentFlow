@@ -3,6 +3,7 @@ const ApiResponse = require('../utils/ApiResponse');
 
 const prisma = require('../utils/prisma');
 const { applyTenantDisplayAll } = require('../utils/tenancyHelpers');
+const { syncEndedTenancies } = require('../jobs/invoiceJob');
 
 function startOfMonth(year, month) {
   return new Date(year, month - 1, 1);
@@ -17,6 +18,17 @@ async function getMyPortal(req, res, next) {
     const now = new Date();
     const monthStart = startOfMonth(now.getFullYear(), now.getMonth() + 1);
     const monthEnd = endOfMonth(now.getFullYear(), now.getMonth() + 1);
+
+    // An owner is scoped by ownerId, not a single organizationId directly —
+    // find which org(s) their properties actually belong to first, so the
+    // occupancy figures below (read from unit.status, fetched in the same
+    // query as everything else) reflect any tenancy that just lapsed.
+    const ownedOrgIds = await prisma.property.findMany({
+      where: { ownerId: req.user.id, isActive: true },
+      select: { organizationId: true },
+      distinct: ['organizationId'],
+    });
+    await Promise.all(ownedOrgIds.map((p) => syncEndedTenancies(p.organizationId)));
 
     const properties = await prisma.property.findMany({
       where: { ownerId: req.user.id, isActive: true },
