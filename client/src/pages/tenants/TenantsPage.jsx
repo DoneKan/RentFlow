@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { Plus, Search, Users } from 'lucide-react'
 import { useTenants } from '../../hooks/useTenants'
+import { getProperties } from '../../services/property.service'
 import { formatCurrency, formatDate } from '../../utils/formatters'
 import PageHeader from '../../components/ui/PageHeader'
 import DataTable from '../../components/ui/DataTable'
@@ -14,8 +16,15 @@ export default function TenantsPage() {
   const navigate = useNavigate()
   const [showAdd, setShowAdd] = useState(false)
   const [search, setSearch] = useState('')
+  const [propertyId, setPropertyId] = useState('')
 
-  const { data, isLoading } = useTenants()
+  const { data: propertiesList } = useQuery({
+    queryKey: ['properties', 'all'],
+    queryFn: () => getProperties({ limit: 200 }),
+    select: (r) => r.data || [],
+  })
+
+  const { data, isLoading } = useTenants(propertyId ? { propertyId } : undefined)
   const tenants = data || []
 
   const filtered = tenants.filter((t) => {
@@ -86,17 +95,29 @@ export default function TenantsPage() {
         ]}
       />
 
-      <div className="mb-4 relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="input pl-9"
-          placeholder="Search by name, email, phone, unit…"
-        />
+      <div className="mb-4 flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="input pl-9"
+            placeholder="Search by name, email, phone, unit…"
+          />
+        </div>
+        <select
+          value={propertyId}
+          onChange={(e) => setPropertyId(e.target.value)}
+          className="input sm:w-56"
+        >
+          <option value="">All Properties</option>
+          {(propertiesList || []).map((p) => (
+            <option key={p.id} value={p.id}>{p.name}</option>
+          ))}
+        </select>
       </div>
 
-      {!isLoading && filtered.length === 0 && !search ? (
+      {!isLoading && filtered.length === 0 && !search && !propertyId ? (
         <EmptyState
           icon={Users}
           title="No tenants yet"
@@ -108,7 +129,7 @@ export default function TenantsPage() {
           columns={columns}
           data={filtered}
           loading={isLoading}
-          emptyMessage="No tenants match your search"
+          emptyMessage="No tenants match these filters"
           onRowClick={(row) => navigate(`/tenants/${row.id}`)}
         />
       )}
