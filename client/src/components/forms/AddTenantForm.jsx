@@ -19,6 +19,7 @@ export default function AddTenantForm({ onClose, defaultPropertyId, defaultName,
     propertyId: defaultPropertyId || '',
     unitId: '',
     startDate: new Date().toISOString().split('T')[0],
+    endDate: '',
     rentAmount: '',
     depositAmount: '',
     paymentPeriod: 'MONTHLY',
@@ -87,6 +88,7 @@ export default function AddTenantForm({ onClose, defaultPropertyId, defaultName,
         name: form.name, email: form.email, phone: form.phone,
         propertyId: form.propertyId, unitId: form.unitId,
         startDate: form.startDate,
+        endDate: form.endDate || undefined,
         rentAmount: parseFloat(form.rentAmount),
         depositAmount: form.depositAmount ? parseFloat(form.depositAmount) : 0,
         notes,
@@ -181,13 +183,9 @@ export default function AddTenantForm({ onClose, defaultPropertyId, defaultName,
                 <input type="date" value={form.startDate} onChange={(e) => set('startDate', e.target.value)} className="input" required />
               </div>
               <div>
-                <label className="label">Payment period</label>
-                <input
-                  value={PAYMENT_PERIODS.find((p) => p.value === form.paymentPeriod)?.label || form.paymentPeriod}
-                  className="input bg-gray-50 text-gray-500"
-                  disabled
-                  title="Set on the unit — edit the unit to change its payment period"
-                />
+                <label className="label">Expected end date <span className="text-gray-400 text-xs">(optional)</span></label>
+                <input type="date" value={form.endDate} onChange={(e) => set('endDate', e.target.value)} className="input" />
+                <p className="text-xs text-gray-400 mt-1">Leave blank for a month-to-month tenancy.</p>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
@@ -199,6 +197,15 @@ export default function AddTenantForm({ onClose, defaultPropertyId, defaultName,
                 <label className="label">Deposit</label>
                 <NumberInput value={form.depositAmount} onChange={(v) => set('depositAmount', v)} placeholder="0" />
               </div>
+            </div>
+            <div>
+              <label className="label">Payment period</label>
+              <input
+                value={PAYMENT_PERIODS.find((p) => p.value === form.paymentPeriod)?.label || form.paymentPeriod}
+                className="input bg-gray-50 text-gray-500"
+                disabled
+                title="Set on the unit — edit the unit to change its payment period"
+              />
             </div>
 
             <div className="border-t border-gray-100 pt-4">
