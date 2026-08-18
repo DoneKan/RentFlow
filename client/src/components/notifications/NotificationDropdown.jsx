@@ -8,6 +8,7 @@ function notifIcon(type) {
     PAYMENT: DollarSign,
     INVOICE: FileText,
     REMINDER: AlertCircle,
+    LANDLORD_EXPENSE_DUE: AlertCircle,
     SYSTEM: Info,
   }
   const Icon = map[type] || Info

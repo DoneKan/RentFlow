@@ -35,6 +35,7 @@ model Organization {
   accounts       Account[]
   journalEntries JournalEntry[]
   importBatches  ImportBatch[]
+  landlordExpenseReminders LandlordExpenseReminder[]
 
   @@map("organizations")
 }
@@ -69,6 +70,7 @@ model User {
   maintenanceRequests  MaintenanceRequest[]  @relation("TenantMaintenance")
   passwordResetTokens  PasswordResetToken[]
   importBatches        ImportBatch[]
+  landlordExpenseReminders LandlordExpenseReminder[]
 
   @@index([email])
   @@index([organizationId])
@@ -124,6 +126,7 @@ model Property {
   inspections         Inspection[]
   prospects           Prospect[]
   budgets             Budget[]
+  landlordExpenseReminders LandlordExpenseReminder[]
 
   @@index([organizationId])
   @@index([code])
@@ -290,6 +293,56 @@ model Expense {
   @@index([category])
   @@index([date])
   @@map("expenses")
+}
+
+// A landlord's own recurring cost (URA rental tax, council fees, askari
+// wages, ...) — deliberately separate from Expense/Invoice/Payment/Tenancy.
+// This is a reminder schedule, not a record of money actually spent: no FK
+// to any tenant-billing entity, and creating/editing one never touches an
+// Expense row. When an actual payment is made against one of these, that
+// still gets logged as a normal Expense the existing way — this model only
+// tracks "when is the next one due" and "have we reminded for it yet".
+model LandlordExpenseReminder {
+  id                     String    @id @default(cuid())
+  organizationId         String
+  propertyId             String?
+  name                   String
+  description            String?
+  amount                 Decimal
+  // MONTHLY | ANNUAL | CUSTOM — CUSTOM uses customIntervalDays below.
+  recurrenceType         String
+  customIntervalDays     Int?
+  // Fixed reference point recurrence is always computed from — never
+  // mutated by the daily rollover, only by a deliberate reschedule (see
+  // controller update()). Every occurrence is anchorDate + N periods,
+  // computed fresh from this same anchor each time, the same principle
+  // invoiceJob.js's addMonthsFromAnchor uses for tenancy billing: compute
+  // from the ORIGINAL anchor every time, never from a previously-computed
+  // occurrence, so a reminder anchored on the 31st doesn't permanently
+  // drift to the 3rd the first time it crosses a 28-day February.
+  anchorDate             DateTime
+  nextDueDate            DateTime
+  // How many days before nextDueDate to notify — a heads-up before the
+  // cost is due, not an after-the-fact overdue notice like the tenant
+  // invoice reminder.
+  remindDaysBefore       Int       @default(7)
+  // Set to the nextDueDate value a reminder was actually sent for, so the
+  // daily job can tell "already reminded for this occurrence" apart from
+  // "this is a new occurrence" without a separate log table. Cleared back
+  // to null whenever nextDueDate rolls forward.
+  lastReminderForDueDate DateTime?
+  isActive               Boolean   @default(true)
+  createdById            String
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  property     Property?    @relation(fields: [propertyId], references: [id])
+  createdBy    User         @relation(fields: [createdById], references: [id])
+
+  @@index([organizationId])
+  @@index([nextDueDate])
+  @@map("landlord_expense_reminders")
 }
 
 model Notification {

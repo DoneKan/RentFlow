@@ -24,6 +24,7 @@ import {
   Landmark,
   BookOpen,
   Upload,
+  BellRing,
 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { getInitials } from '../../utils/formatters'
@@ -38,6 +39,7 @@ const MANAGER_NAV = [
   { to: '/leases', icon: FileSignature, label: 'Lease Documents' },
   { to: '/payments', icon: CreditCard, label: 'Payments' },
   { to: '/expenses', icon: Receipt, label: 'Expenses' },
+  { to: '/expense-reminders', icon: BellRing, label: 'Expense Reminders' },
   { to: '/maintenance', icon: Wrench, label: 'Maintenance' },
   { to: '/vendors', icon: HardHat, label: 'Vendors' },
   { to: '/inspections', icon: ClipboardCheck, label: 'Inspections' },

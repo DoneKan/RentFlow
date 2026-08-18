@@ -40,6 +40,12 @@ export const PAYMENT_PERIODS = [
   { value: 'ANNUAL', label: 'Annual (1 year)' },
 ]
 
+export const RECURRENCE_TYPES = [
+  { value: 'MONTHLY', label: 'Monthly' },
+  { value: 'ANNUAL', label: 'Annual' },
+  { value: 'CUSTOM', label: 'Custom interval (days)' },
+]
+
 export const UNIT_STATUSES = [
   { value: 'VACANT', label: 'Vacant' },
   { value: 'OCCUPIED', label: 'Occupied' },

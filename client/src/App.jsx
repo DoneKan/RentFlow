@@ -18,6 +18,7 @@ import InvoicesPage from './pages/invoices/InvoicesPage'
 import InvoiceDetailPage from './pages/invoices/InvoiceDetailPage'
 import PaymentsPage from './pages/payments/PaymentsPage'
 import ExpensesPage from './pages/expenses/ExpensesPage'
+import ExpenseRemindersPage from './pages/expenses/ExpenseRemindersPage'
 import ReportsPage from './pages/reports/ReportsPage'
 import SettingsPage from './pages/settings/SettingsPage'
 import ProfilePage from './pages/settings/ProfilePage'
@@ -92,6 +93,7 @@ export default function App() {
           <Route path="/invoices/:id" element={<InvoiceDetailPage />} />
           <Route path="/payments" element={<PaymentsPage />} />
           <Route path="/expenses" element={<ExpensesPage />} />
+          <Route path="/expense-reminders" element={<ExpenseRemindersPage />} />
           <Route path="/reports" element={<ReportsPage />} />
           <Route path="/maintenance" element={<MaintenancePage />} />
           <Route path="/vendors" element={<VendorsPage />} />

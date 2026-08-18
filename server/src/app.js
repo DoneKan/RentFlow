@@ -32,6 +32,7 @@ const budgetRoutes = require('./routes/budget.routes');
 const accountRoutes = require('./routes/account.routes');
 const ledgerRoutes = require('./routes/ledger.routes');
 const importRoutes = require('./routes/import.routes');
+const landlordExpenseReminderRoutes = require('./routes/landlordExpenseReminder.routes');
 
 const app = express();
 
@@ -115,6 +116,7 @@ app.use(`${API}/budgets`, budgetRoutes);
 app.use(`${API}/accounts`, accountRoutes);
 app.use(`${API}/ledger`, ledgerRoutes);
 app.use(`${API}/imports`, importRoutes);
+app.use(`${API}/landlord-expense-reminders`, landlordExpenseReminderRoutes);
 
 // 404 handler
 app.use((req, res, next) => {
@@ -143,6 +145,8 @@ async function start() {
     if (process.env.NODE_ENV !== 'test') {
       const { initializeJobs } = require('./jobs/invoiceJob');
       initializeJobs();
+      const { initializeJobs: initializeLandlordExpenseJobs } = require('./jobs/landlordExpenseJob');
+      initializeLandlordExpenseJobs();
       logger.info('Cron jobs initialized');
     }
 
