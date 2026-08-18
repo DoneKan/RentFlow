@@ -36,12 +36,14 @@ const updateSchema = Joi.object({
   isActive: Joi.boolean(),
 });
 
-router.use(authenticate, authorize(...STAFF_ROLES));
+router.use(authenticate);
 
-router.get('/', controller.list);
-router.post('/', validate(createSchema), controller.create);
-router.get('/:id', controller.getOne);
-router.put('/:id', validate(updateSchema), controller.update);
-router.delete('/:id', controller.remove);
+// Accountant can see upcoming recurring costs (useful for cash-flow
+// awareness) but not set them up or change the schedule.
+router.get('/', authorize(...STAFF_ROLES, 'ACCOUNTANT'), controller.list);
+router.post('/', authorize(...STAFF_ROLES), validate(createSchema), controller.create);
+router.get('/:id', authorize(...STAFF_ROLES, 'ACCOUNTANT'), controller.getOne);
+router.put('/:id', authorize(...STAFF_ROLES), validate(updateSchema), controller.update);
+router.delete('/:id', authorize(...STAFF_ROLES), controller.remove);
 
 module.exports = router;

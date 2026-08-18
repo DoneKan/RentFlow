@@ -8,6 +8,9 @@ const { verifyWebhookSignature } = require('../middleware/webhookSignature');
 const router = Router();
 
 const STAFF_ROLES = ['SUPER_ADMIN', 'ADMIN', 'PROPERTY_MANAGER', 'LANDLORD'];
+// Recording payments is core bookkeeping — Accountant gets full access here,
+// unlike most other STAFF_ROLES-gated areas.
+const PAYMENT_ROLES = [...STAFF_ROLES, 'ACCOUNTANT'];
 
 const manualPaymentSchema = Joi.object({
   invoiceId: Joi.string().required(),
@@ -27,12 +30,12 @@ const airtelSchema = Joi.object({
   mobileNumber: Joi.string().required(),
 });
 
-router.get('/', authenticate, authorize(...STAFF_ROLES), controller.list);
-router.post('/', authenticate, authorize(...STAFF_ROLES), validate(manualPaymentSchema), controller.recordManual);
-router.get('/:id', authenticate, authorize(...STAFF_ROLES), controller.getOne);
-router.get('/:id/receipt', authenticate, authorize(...STAFF_ROLES), controller.getReceipt);
-router.post('/mtn/initiate', authenticate, authorize(...STAFF_ROLES), validate(mtnSchema), controller.initiateMtn);
-router.post('/airtel/initiate', authenticate, authorize(...STAFF_ROLES), validate(airtelSchema), controller.initiateAirtel);
+router.get('/', authenticate, authorize(...PAYMENT_ROLES), controller.list);
+router.post('/', authenticate, authorize(...PAYMENT_ROLES), validate(manualPaymentSchema), controller.recordManual);
+router.get('/:id', authenticate, authorize(...PAYMENT_ROLES), controller.getOne);
+router.get('/:id/receipt', authenticate, authorize(...PAYMENT_ROLES), controller.getReceipt);
+router.post('/mtn/initiate', authenticate, authorize(...PAYMENT_ROLES), validate(mtnSchema), controller.initiateMtn);
+router.post('/airtel/initiate', authenticate, authorize(...PAYMENT_ROLES), validate(airtelSchema), controller.initiateAirtel);
 router.post(
   '/webhook/mtn',
   verifyWebhookSignature({ headerName: 'X-Mtn-Signature', secretEnvVar: 'MTN_WEBHOOK_SECRET' }),

@@ -32,13 +32,15 @@ const updateSchema = Joi.object({
   lines: Joi.array().items(lineSchema),
 });
 
-router.use(authenticate, authorize(...STAFF_ROLES));
+router.use(authenticate);
 
-router.get('/', controller.list);
-router.post('/', validate(createSchema), controller.create);
-router.get('/:id', controller.getOne);
-router.put('/:id', validate(updateSchema), controller.update);
-router.get('/:id/variance', controller.variance);
-router.delete('/:id', controller.remove);
+// Accountant can view budgets and variance but not set/edit them — planning
+// the budget is a management decision, not bookkeeping.
+router.get('/', authorize(...STAFF_ROLES, 'ACCOUNTANT'), controller.list);
+router.post('/', authorize(...STAFF_ROLES), validate(createSchema), controller.create);
+router.get('/:id', authorize(...STAFF_ROLES, 'ACCOUNTANT'), controller.getOne);
+router.put('/:id', authorize(...STAFF_ROLES), validate(updateSchema), controller.update);
+router.get('/:id/variance', authorize(...STAFF_ROLES, 'ACCOUNTANT'), controller.variance);
+router.delete('/:id', authorize(...STAFF_ROLES), controller.remove);
 
 module.exports = router;
