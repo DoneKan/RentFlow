@@ -137,6 +137,10 @@ export default function TenantDetailPage() {
                 <p className="font-medium mt-0.5">{formatDate(tenancy.startDate)}</p>
               </div>
               <div>
+                <p className="text-gray-500">End Date</p>
+                <p className="font-medium mt-0.5">{tenancy.endDate ? formatDate(tenancy.endDate) : 'Month-to-month'}</p>
+              </div>
+              <div>
                 <p className="text-gray-500">Payment Period</p>
                 <p className="font-medium mt-0.5">{tenancy.unit?.paymentPeriod}</p>
               </div>

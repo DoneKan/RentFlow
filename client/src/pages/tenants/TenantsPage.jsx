@@ -80,6 +80,11 @@ export default function TenantsPage() {
       label: 'Move-in',
       render: (v) => formatDate(v),
     },
+    {
+      key: 'endDate',
+      label: 'End Date',
+      render: (v) => v ? formatDate(v) : <span className="text-gray-400">Month-to-month</span>,
+    },
   ]
 
   return (
