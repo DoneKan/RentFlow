@@ -1,11 +1,15 @@
 import { useState } from 'react'
-import { Building2, CreditCard, Bell, AlertTriangle, Check, TrendingUp } from 'lucide-react'
+import { Building2, CreditCard, Bell, AlertTriangle, Check, TrendingUp, Users, Send, Trash2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '../../context/AuthContext'
 import PageHeader from '../../components/ui/PageHeader'
 import ConfirmDialog from '../../components/ui/ConfirmDialog'
+import StatusBadge from '../../components/ui/StatusBadge'
 import api from '../../services/api'
+import { useTeam, useUpdateTeamMember } from '../../hooks/useTeam'
+import { useInvitations, useCreateInvitation, useRevokeInvitation } from '../../hooks/useInvitations'
+import { formatDate } from '../../utils/formatters'
 
 function Toggle({ enabled, onChange }) {
   return (
@@ -19,12 +23,24 @@ function Toggle({ enabled, onChange }) {
   )
 }
 
-const TABS = [
+const BASE_TABS = [
   { id: 'organization', label: 'Organization', icon: Building2 },
   { id: 'subscription', label: 'Subscription', icon: CreditCard },
   { id: 'notifications', label: 'Notifications', icon: Bell },
   { id: 'danger', label: 'Danger Zone', icon: AlertTriangle },
 ]
+
+const TEAM_TAB = { id: 'team', label: 'Team', icon: Users }
+
+const ROLE_LABELS = {
+  SUPER_ADMIN: 'Super Admin',
+  ADMIN: 'Admin',
+  PROPERTY_MANAGER: 'Property Manager',
+  LANDLORD: 'Landlord',
+  ACCOUNTANT: 'Accountant',
+}
+
+const INVITABLE_ROLES = ['ADMIN', 'PROPERTY_MANAGER', 'LANDLORD', 'ACCOUNTANT']
 
 const PLANS = [
   {
@@ -87,6 +103,8 @@ function UsageBar({ label, used, limit }) {
 
 export default function SettingsPage() {
   const { user } = useAuth()
+  const isAdminTier = user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN'
+  const TABS = isAdminTier ? [...BASE_TABS.slice(0, 1), TEAM_TAB, ...BASE_TABS.slice(1)] : BASE_TABS
   const [activeTab, setActiveTab] = useState('organization')
   const [deleteOpen, setDeleteOpen] = useState(false)
 
@@ -99,6 +117,10 @@ export default function SettingsPage() {
     monthlyReports: true,
   })
 
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [inviteRole, setInviteRole] = useState('PROPERTY_MANAGER')
+  const [revokeTarget, setRevokeTarget] = useState(null)
+
   const { data: subData } = useQuery({
     queryKey: ['subscription'],
     queryFn: () => api.get('/reports/subscription'),
@@ -106,6 +128,52 @@ export default function SettingsPage() {
     enabled: activeTab === 'subscription',
     refetchOnMount: 'always',
   })
+
+  const { data: team, isLoading: teamLoading } = useTeam()
+  const { data: invitations, isLoading: invitationsLoading } = useInvitations()
+  const createInvitation = useCreateInvitation()
+  const revokeInvitation = useRevokeInvitation()
+  const updateTeamMember = useUpdateTeamMember()
+
+  const handleInvite = async (e) => {
+    e.preventDefault()
+    if (!inviteEmail.trim()) { toast.error('Enter an email address'); return }
+    try {
+      await createInvitation.mutateAsync({ email: inviteEmail.trim(), role: inviteRole })
+      toast.success(`Invitation sent to ${inviteEmail.trim()}`)
+      setInviteEmail('')
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to send invitation')
+    }
+  }
+
+  const handleRevoke = async () => {
+    try {
+      await revokeInvitation.mutateAsync(revokeTarget.id)
+      toast.success('Invitation revoked')
+    } catch {
+      toast.error('Failed to revoke invitation')
+    }
+    setRevokeTarget(null)
+  }
+
+  const handleRoleChange = async (member, role) => {
+    try {
+      await updateTeamMember.mutateAsync({ id: member.id, data: { role } })
+      toast.success(`${member.name}'s role updated`)
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to update role')
+    }
+  }
+
+  const handleToggleActive = async (member) => {
+    try {
+      await updateTeamMember.mutateAsync({ id: member.id, data: { isActive: !member.isActive } })
+      toast.success(member.isActive ? `${member.name} deactivated` : `${member.name} reactivated`)
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to update member')
+    }
+  }
 
   const currentPlanId = subData?.plan || user?.organization?.plan || 'FREE'
   const currentPlan = PLANS.find((p) => p.id === currentPlanId) || PLANS[0]
@@ -288,6 +356,122 @@ export default function SettingsPage() {
           </div>
         </div>
       )}
+
+      {activeTab === 'team' && isAdminTier && (
+        <div className="space-y-6">
+          <div className="card">
+            <h2 className="text-base font-semibold text-gray-900 mb-1">Invite a Team Member</h2>
+            <p className="text-sm text-gray-500 mb-4">
+              They'll get an email with a link to set their own password and join {user?.organization?.name}.
+            </p>
+            <form onSubmit={handleInvite} className="flex flex-col sm:flex-row gap-3">
+              <input
+                type="email"
+                value={inviteEmail}
+                onChange={(e) => setInviteEmail(e.target.value)}
+                className="input flex-1"
+                placeholder="colleague@email.com"
+                required
+              />
+              <select value={inviteRole} onChange={(e) => setInviteRole(e.target.value)} className="input sm:w-52">
+                {INVITABLE_ROLES.map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
+              </select>
+              <button type="submit" disabled={createInvitation.isPending} className="btn-primary flex items-center justify-center gap-2 whitespace-nowrap">
+                <Send className="h-4 w-4" /> {createInvitation.isPending ? 'Sending…' : 'Send Invite'}
+              </button>
+            </form>
+          </div>
+
+          <div className="card">
+            <h2 className="text-base font-semibold text-gray-900 mb-4">Team Members</h2>
+            {teamLoading ? (
+              <p className="text-sm text-gray-400">Loading…</p>
+            ) : !team?.length ? (
+              <p className="text-sm text-gray-400">No team members yet.</p>
+            ) : (
+              <div className="divide-y divide-gray-100">
+                {team.map((member) => (
+                  <div key={member.id} className="flex flex-col sm:flex-row sm:items-center gap-3 py-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900">
+                        {member.name}
+                        {member.id === user?.id && <span className="ml-2 text-xs text-brand font-normal">(You)</span>}
+                      </p>
+                      <p className="text-xs text-gray-400">{member.email}</p>
+                    </div>
+                    {member.role === 'SUPER_ADMIN' || member.id === user?.id ? (
+                      <span className="text-xs font-medium text-gray-500 px-2.5 py-1.5">{ROLE_LABELS[member.role] || member.role}</span>
+                    ) : (
+                      <select
+                        value={member.role}
+                        onChange={(e) => handleRoleChange(member, e.target.value)}
+                        className="input py-1.5 text-xs sm:w-44"
+                      >
+                        {INVITABLE_ROLES.map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
+                      </select>
+                    )}
+                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full text-center ${member.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                      {member.isActive ? 'Active' : 'Deactivated'}
+                    </span>
+                    {member.id === user?.id ? (
+                      <span className="text-xs text-gray-300 w-20 text-right">—</span>
+                    ) : (
+                      <button
+                        onClick={() => handleToggleActive(member)}
+                        className={`text-xs font-medium hover:underline w-20 text-right ${member.isActive ? 'text-red-500' : 'text-green-600'}`}
+                      >
+                        {member.isActive ? 'Deactivate' : 'Reactivate'}
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="card">
+            <h2 className="text-base font-semibold text-gray-900 mb-4">Pending & Past Invitations</h2>
+            {invitationsLoading ? (
+              <p className="text-sm text-gray-400">Loading…</p>
+            ) : !invitations?.length ? (
+              <p className="text-sm text-gray-400">No invitations sent yet.</p>
+            ) : (
+              <div className="divide-y divide-gray-100">
+                {invitations.map((inv) => (
+                  <div key={inv.id} className="flex flex-col sm:flex-row sm:items-center gap-3 py-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900">{inv.email}</p>
+                      <p className="text-xs text-gray-400">
+                        {ROLE_LABELS[inv.role] || inv.role} · Invited by {inv.invitedBy?.name} · {formatDate(inv.createdAt)}
+                      </p>
+                    </div>
+                    <StatusBadge status={inv.status} />
+                    {inv.status === 'PENDING' && (
+                      <button
+                        onClick={() => setRevokeTarget(inv)}
+                        className="text-xs text-red-500 hover:underline flex items-center gap-1 w-20 justify-end"
+                      >
+                        <Trash2 className="h-3 w-3" /> Revoke
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      <ConfirmDialog
+        isOpen={!!revokeTarget}
+        onClose={() => setRevokeTarget(null)}
+        onConfirm={handleRevoke}
+        title="Revoke Invitation"
+        message={`Are you sure you want to revoke the invitation sent to ${revokeTarget?.email}? The link they were emailed will stop working.`}
+        confirmLabel="Revoke"
+        isDangerous
+        isLoading={revokeInvitation.isPending}
+      />
 
       {activeTab === 'danger' && (
         <div className="card border-2 border-red-200">

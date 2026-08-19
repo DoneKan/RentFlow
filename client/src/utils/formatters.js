@@ -59,6 +59,8 @@ export function getStatusBadgeClass(status) {
     LOST: 'badge-draft',
     NOT_STARTED: 'badge-draft',
     SCHEDULED: 'badge-pending',
+    ACCEPTED: 'badge-paid',
+    REVOKED: 'badge-overdue',
   }
   return map[status] || 'badge-draft'
 }

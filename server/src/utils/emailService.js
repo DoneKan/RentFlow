@@ -101,6 +101,23 @@ async function sendPasswordResetEmail(user, resetUrl) {
   return sendEmail({ to: user.email, subject: 'Reset your RentFlow password', html });
 }
 
+async function sendInvitationEmail({ email, organizationName, role, invitedByName, acceptUrl }) {
+  const html = `
+    <style>${baseStyles}</style>
+    <div class="container">
+      <div class="header"><h1>RentFlow</h1><p>Property Management System</p></div>
+      <div class="body">
+        <h2>You've been invited to join ${organizationName}</h2>
+        <p>${invitedByName} has invited you to join <strong>${organizationName}</strong> on RentFlow as <strong>${role.replace(/_/g, ' ')}</strong>. This link is valid for 7 days and can only be used once.</p>
+        <a href="${acceptUrl}" class="btn">Accept Invitation</a>
+        <p style="color:#6b7280;font-size:12px;">If you weren't expecting this, you can safely ignore this email.</p>
+      </div>
+      <div class="footer"><p>RentFlow — Built for Uganda. Ready for East Africa.</p><p>© ${new Date().getFullYear()} RentFlow</p></div>
+    </div>`;
+
+  return sendEmail({ to: email, subject: `You've been invited to join ${organizationName} on RentFlow`, html });
+}
+
 async function sendInvoiceEmail(tenant, invoice, unit, property, pdfBuffer) {
   const html = `
     <style>${baseStyles}</style>
@@ -225,6 +242,7 @@ module.exports = {
   sendEmail,
   sendWelcomeEmail,
   sendPasswordResetEmail,
+  sendInvitationEmail,
   sendInvoiceEmail,
   sendPaymentReceipt,
   sendRentReminder,

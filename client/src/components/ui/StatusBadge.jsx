@@ -31,6 +31,8 @@ const STATUS_LABELS = {
   LOST: 'Lost',
   NOT_STARTED: 'Not Started',
   SCHEDULED: 'Scheduled',
+  ACCEPTED: 'Accepted',
+  REVOKED: 'Revoked',
 }
 
 export default function StatusBadge({ status }) {

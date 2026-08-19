@@ -33,6 +33,8 @@ const accountRoutes = require('./routes/account.routes');
 const ledgerRoutes = require('./routes/ledger.routes');
 const importRoutes = require('./routes/import.routes');
 const landlordExpenseReminderRoutes = require('./routes/landlordExpenseReminder.routes');
+const invitationRoutes = require('./routes/invitation.routes');
+const teamRoutes = require('./routes/team.routes');
 
 const app = express();
 
@@ -117,6 +119,8 @@ app.use(`${API}/accounts`, accountRoutes);
 app.use(`${API}/ledger`, ledgerRoutes);
 app.use(`${API}/imports`, importRoutes);
 app.use(`${API}/landlord-expense-reminders`, landlordExpenseReminderRoutes);
+app.use(`${API}/invitations`, invitationRoutes);
+app.use(`${API}/team`, teamRoutes);
 
 // 404 handler
 app.use((req, res, next) => {

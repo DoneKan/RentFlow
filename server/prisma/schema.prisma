@@ -36,6 +36,7 @@ model Organization {
   journalEntries JournalEntry[]
   importBatches  ImportBatch[]
   landlordExpenseReminders LandlordExpenseReminder[]
+  invitations    Invitation[]
 
   @@map("organizations")
 }
@@ -71,6 +72,7 @@ model User {
   passwordResetTokens  PasswordResetToken[]
   importBatches        ImportBatch[]
   landlordExpenseReminders LandlordExpenseReminder[]
+  invitationsSent      Invitation[]          @relation("InvitationsSent")
 
   @@index([email])
   @@index([organizationId])
@@ -93,6 +95,32 @@ model PasswordResetToken {
 
   @@index([userId])
   @@map("password_reset_tokens")
+}
+
+// A pending offer for someone to join an existing organization with a
+// specific role — the mechanism referenced throughout the roles work
+// ("no way to actually assign a role without direct DB access") that
+// didn't exist until now. Same security shape as PasswordResetToken: the
+// raw token is only ever emailed, never stored — only its hash is, and
+// it's single-use (acceptedAt) and time-limited (expiresAt).
+model Invitation {
+  id             String    @id @default(cuid())
+  organizationId String
+  email          String
+  role           String
+  tokenHash      String    @unique
+  invitedById    String
+  expiresAt      DateTime
+  acceptedAt     DateTime?
+  revokedAt      DateTime?
+  createdAt      DateTime  @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  invitedBy    User         @relation("InvitationsSent", fields: [invitedById], references: [id])
+
+  @@index([organizationId])
+  @@index([email])
+  @@map("invitations")
 }
 
 model Property {
