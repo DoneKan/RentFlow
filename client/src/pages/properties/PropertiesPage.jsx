@@ -20,17 +20,17 @@ function PropertyCard({ property, onClick }) {
       onClick={onClick}
       className="card text-left hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 w-full"
     >
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand/10">
+      <div className="flex items-start justify-between gap-2 mb-3">
+        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-brand/10">
           <Building2 className="h-5 w-5 text-brand" />
         </div>
-        <span className="text-xs font-mono bg-gray-100 text-gray-600 px-2 py-0.5 rounded">
+        <span className="text-xs font-mono bg-gray-100 text-gray-600 px-2 py-0.5 rounded truncate max-w-[45%]">
           {property.code}
         </span>
       </div>
 
-      <h3 className="font-semibold text-gray-900 text-base">{property.name}</h3>
-      <div className="flex items-center gap-1 mt-1 text-sm text-gray-500">
+      <h3 className="font-semibold text-gray-900 text-base truncate" title={property.name}>{property.name}</h3>
+      <div className="flex items-center gap-1 mt-1 text-sm text-gray-500 min-w-0">
         <MapPin className="h-3.5 w-3.5 flex-shrink-0" />
         <span className="truncate">{property.city}{property.district ? `, ${property.district}` : ''}</span>
       </div>
@@ -44,8 +44,10 @@ function PropertyCard({ property, onClick }) {
           <p className="text-lg font-bold text-gray-900">{occupancyRate}%</p>
           <p className="text-xs text-gray-400">Occupied</p>
         </div>
-        <div className="text-center">
-          <p className="text-sm font-bold text-gray-900">{formatCurrency(property.monthlyRevenue || 0)}</p>
+        <div className="text-center min-w-0">
+          <p className="text-sm font-bold text-gray-900 truncate" title={formatCurrency(property.monthlyRevenue || 0)}>
+            {formatCurrency(property.monthlyRevenue || 0)}
+          </p>
           <p className="text-xs text-gray-400">Revenue</p>
         </div>
       </div>
@@ -58,9 +60,9 @@ function PropertyCard({ property, onClick }) {
       </div>
 
       {property.manager && (
-        <div className="mt-3 flex items-center gap-1.5 text-xs text-gray-400">
-          <Users className="h-3 w-3" />
-          {property.manager.name}
+        <div className="mt-3 flex items-center gap-1.5 text-xs text-gray-400 min-w-0">
+          <Users className="h-3 w-3 flex-shrink-0" />
+          <span className="truncate" title={property.manager.name}>{property.manager.name}</span>
         </div>
       )}
     </button>
