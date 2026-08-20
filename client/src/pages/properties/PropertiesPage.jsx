@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus, Search, Building2, MapPin, Users, TrendingUp, Upload } from 'lucide-react'
 import { useProperties } from '../../hooks/useProperties'
+import { useAuth } from '../../context/AuthContext'
 import { formatCurrency } from '../../utils/formatters'
 import { PROPERTY_TYPES } from '../../utils/constants'
 import PageHeader from '../../components/ui/PageHeader'
@@ -11,6 +12,8 @@ import AddPropertyForm from '../../components/forms/AddPropertyForm'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 
 function PropertyCard({ property, onClick }) {
+  const { user } = useAuth()
+  const currency = user?.organization?.currency || 'UGX'
   const occupiedUnits = property.occupiedUnits || 0
   const totalUnits = property.totalUnits || 0
   const occupancyRate = totalUnits > 0 ? Math.round((occupiedUnits / totalUnits) * 100) : 0
@@ -45,8 +48,8 @@ function PropertyCard({ property, onClick }) {
           <p className="text-xs text-gray-400">Occupied</p>
         </div>
         <div className="text-center min-w-0">
-          <p className="text-sm font-bold text-gray-900 truncate" title={formatCurrency(property.monthlyRevenue || 0)}>
-            {formatCurrency(property.monthlyRevenue || 0)}
+          <p className="text-sm font-bold text-gray-900 truncate" title={formatCurrency(property.monthlyRevenue || 0, currency)}>
+            {formatCurrency(property.monthlyRevenue || 0, currency)}
           </p>
           <p className="text-xs text-gray-400">Revenue</p>
         </div>

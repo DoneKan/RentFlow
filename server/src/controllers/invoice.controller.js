@@ -142,6 +142,7 @@ async function create(req, res, next) {
         propertyId: tenancy.propertyId,
         tenantId: tenancy.tenantId,
         amount: total,
+        currency: tenancy.unit.currency,
         dueDate: new Date(dueDate),
         items: JSON.stringify(items),
         latePenalty: latePenalty || 0,

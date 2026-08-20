@@ -26,17 +26,17 @@ model Organization {
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 
-  users          User[]
-  properties     Property[]
-  vendors        Vendor[]
-  prospects      Prospect[]
-  inspections    Inspection[]
-  budgets        Budget[]
-  accounts       Account[]
-  journalEntries JournalEntry[]
-  importBatches  ImportBatch[]
+  users                    User[]
+  properties               Property[]
+  vendors                  Vendor[]
+  prospects                Prospect[]
+  inspections              Inspection[]
+  budgets                  Budget[]
+  accounts                 Account[]
+  journalEntries           JournalEntry[]
+  importBatches            ImportBatch[]
   landlordExpenseReminders LandlordExpenseReminder[]
-  invitations    Invitation[]
+  invitations              Invitation[]
 
   @@map("organizations")
 }
@@ -61,18 +61,18 @@ model User {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  organization         Organization?         @relation(fields: [organizationId], references: [id])
-  managedProperties    Property[]            @relation("PropertyManager")
-  ownedProperties      Property[]            @relation("PropertyOwner")
-  tenantProfile        Tenancy[]             @relation("TenantUser")
-  invoices             Invoice[]             @relation("TenantInvoices")
-  payments             Payment[]             @relation("TenantPayments")
-  notifications        Notification[]
-  maintenanceRequests  MaintenanceRequest[]  @relation("TenantMaintenance")
-  passwordResetTokens  PasswordResetToken[]
-  importBatches        ImportBatch[]
+  organization             Organization?             @relation(fields: [organizationId], references: [id])
+  managedProperties        Property[]                @relation("PropertyManager")
+  ownedProperties          Property[]                @relation("PropertyOwner")
+  tenantProfile            Tenancy[]                 @relation("TenantUser")
+  invoices                 Invoice[]                 @relation("TenantInvoices")
+  payments                 Payment[]                 @relation("TenantPayments")
+  notifications            Notification[]
+  maintenanceRequests      MaintenanceRequest[]      @relation("TenantMaintenance")
+  passwordResetTokens      PasswordResetToken[]
+  importBatches            ImportBatch[]
   landlordExpenseReminders LandlordExpenseReminder[]
-  invitationsSent      Invitation[]          @relation("InvitationsSent")
+  invitationsSent          Invitation[]              @relation("InvitationsSent")
 
   @@index([email])
   @@index([organizationId])
@@ -143,17 +143,17 @@ model Property {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  manager             User                 @relation("PropertyManager", fields: [managerId], references: [id])
-  owner               User?                @relation("PropertyOwner", fields: [ownerId], references: [id])
-  organization        Organization         @relation(fields: [organizationId], references: [id])
-  units               Unit[]
-  expenses            Expense[]
-  tenancies           Tenancy[]
-  invoices            Invoice[]
-  maintenanceRequests MaintenanceRequest[]
-  inspections         Inspection[]
-  prospects           Prospect[]
-  budgets             Budget[]
+  manager                  User                      @relation("PropertyManager", fields: [managerId], references: [id])
+  owner                    User?                     @relation("PropertyOwner", fields: [ownerId], references: [id])
+  organization             Organization              @relation(fields: [organizationId], references: [id])
+  units                    Unit[]
+  expenses                 Expense[]
+  tenancies                Tenancy[]
+  invoices                 Invoice[]
+  maintenanceRequests      MaintenanceRequest[]
+  inspections              Inspection[]
+  prospects                Prospect[]
+  budgets                  Budget[]
   landlordExpenseReminders LandlordExpenseReminder[]
 
   @@index([organizationId])
@@ -192,16 +192,16 @@ model Unit {
 }
 
 model Tenancy {
-  id            String    @id @default(cuid())
-  unitId        String
-  tenantId      String
-  propertyId    String
-  startDate     DateTime
-  endDate       DateTime?
-  rentAmount    Decimal
-  depositAmount Decimal   @default(0)
-  status        String    @default("ACTIVE")
-  notes         String?
+  id                   String    @id @default(cuid())
+  unitId               String
+  tenantId             String
+  propertyId           String
+  startDate            DateTime
+  endDate              DateTime?
+  rentAmount           Decimal
+  depositAmount        Decimal   @default(0)
+  status               String    @default("ACTIVE")
+  notes                String?
   // Per-tenancy contact snapshot, deliberately separate from the linked
   // User's own name/phone. The linked User is a login account, and one
   // account (one email) can be reused across multiple Tenancy rows when an
@@ -209,10 +209,19 @@ model Tenancy {
   // name/phone can't double as "this tenancy's tenant display info" without
   // every tenancy sharing that account aliasing to the same values. This is
   // what every "tenant name" read/write should use instead of tenant.name.
-  tenantName    String
-  tenantPhone   String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  tenantName           String
+  tenantPhone          String?
+  // Per-tenancy billing-cadence snapshot, same reasoning as tenantName/
+  // tenantPhone/rentAmount above: the unit's own paymentPeriod is only the
+  // default at assignment time. invoiceJob.js's periodMonths() reads this
+  // field, not tenancy.unit.paymentPeriod, so a later edit to the unit's
+  // default doesn't retroactively change the billing cadence of a tenancy
+  // that's already running. MONTHLY | QUARTERLY | SEMI_ANNUAL | ANNUAL |
+  // CUSTOM — customIntervalMonths is only meaningful for CUSTOM.
+  paymentPeriod        String
+  customIntervalMonths Int?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 
   unit                Unit                 @relation(fields: [unitId], references: [id])
   tenant              User                 @relation("TenantUser", fields: [tenantId], references: [id])
@@ -229,34 +238,34 @@ model Tenancy {
 }
 
 model Invoice {
-  id            String    @id @default(cuid())
-  invoiceNumber String    @unique
-  tenancyId     String
-  unitId        String
-  propertyId    String
-  tenantId      String
-  amount        Decimal
-  currency      String    @default("UGX")
-  dueDate       DateTime
-  items         String
-  latePenalty   Decimal   @default(0)
-  notes         String?
-  status        String    @default("DRAFT")
-  sentAt        DateTime?
-  paidAt        DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id                String    @id @default(cuid())
+  invoiceNumber     String    @unique
+  tenancyId         String
+  unitId            String
+  propertyId        String
+  tenantId          String
+  amount            Decimal
+  currency          String    @default("UGX")
+  dueDate           DateTime
+  items             String
+  latePenalty       Decimal   @default(0)
+  notes             String?
+  status            String    @default("DRAFT")
+  sentAt            DateTime?
+  paidAt            DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
   // Set only by the recurring-invoice job, to "YYYY-MM" of the billing
   // month — the (tenancyId, billingPeriod) unique constraint below is what
   // makes that job idempotent even under concurrent/duplicate runs. Left
   // null on manually-created invoices, which never collide with each other
   // since SQL treats every NULL as distinct under a unique constraint.
-  billingPeriod String?
+  billingPeriod     String?
   // Snapshot, taken when this draft was auto-generated, of the tenant's
   // other outstanding (SENT/OVERDUE) balance at that moment — so a
   // generated draft surfaces "they're behind" instead of silently
   // producing another invoice next to an unpaid one.
-  priorUnpaidAmount Decimal @default(0)
+  priorUnpaidAmount Decimal   @default(0)
 
   tenancy  Tenancy   @relation(fields: [tenancyId], references: [id])
   unit     Unit      @relation(fields: [unitId], references: [id])

@@ -9,6 +9,7 @@ import ConfirmDialog from '../../components/ui/ConfirmDialog'
 import Modal from '../../components/ui/Modal'
 import LogExpenseForm from '../../components/forms/LogExpenseForm'
 import StatusBadge from '../../components/ui/StatusBadge'
+import { useAuth } from '../../context/AuthContext'
 import { getExpenses, deleteExpense } from '../../services/expense.service'
 import { formatCurrency, formatDate } from '../../utils/formatters'
 
@@ -39,6 +40,8 @@ const CATEGORY_LABELS = {
 }
 
 export default function ExpensesPage() {
+  const { user } = useAuth()
+  const currency = user?.organization?.currency || 'UGX'
   const queryClient = useQueryClient()
   const [showForm, setShowForm] = useState(false)
   const [editExpense, setEditExpense] = useState(null)
@@ -92,7 +95,7 @@ export default function ExpensesPage() {
     { key: 'vendor', label: 'Vendor', render: (v) => v || '—' },
     {
       key: 'amount', label: 'Amount',
-      render: (v) => <span className="font-semibold text-red-600">{formatCurrency(v)}</span>,
+      render: (v, row) => <span className="font-semibold text-red-600">{formatCurrency(v, row.currency || currency)}</span>,
     },
     {
       key: 'actions', label: '',
@@ -114,10 +117,10 @@ export default function ExpensesPage() {
   // updated separately (that drift is exactly how the old hardcoded
   // 5-category card list went stale).
   const summaryCards = [
-    { title: 'Total Expenses', value: formatCurrency(totalExpenses), color: 'bg-red-50 text-red-700' },
+    { title: 'Total Expenses', value: formatCurrency(totalExpenses, currency), color: 'bg-red-50 text-red-700' },
     ...Object.entries(CATEGORY_LABELS).map(([key, label]) => ({
       title: label,
-      value: formatCurrency(categoryTotals[key] || 0),
+      value: formatCurrency(categoryTotals[key] || 0, currency),
       color: 'bg-gray-50 text-gray-700',
     })),
   ]

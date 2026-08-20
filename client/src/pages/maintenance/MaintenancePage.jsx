@@ -5,6 +5,7 @@ import {
   useMaintenance, useUpdateMaintenance, useDeleteMaintenance, useAssignVendor, useCompleteMaintenance,
 } from '../../hooks/useMaintenance'
 import { useVendors } from '../../hooks/useVendors'
+import { useAuth } from '../../context/AuthContext'
 import { formatDate, formatCurrency } from '../../utils/formatters'
 import StatusBadge from '../../components/ui/StatusBadge'
 import DataTable from '../../components/ui/DataTable'
@@ -22,6 +23,8 @@ const PRIORITY_COLORS = {
 const STATUS_OPTIONS = ['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED']
 
 function VendorAssignment({ request }) {
+  const { user } = useAuth()
+  const currency = user?.organization?.currency || 'UGX'
   const { data: vendorsData } = useVendors({ isActive: 'true' })
   const assign = useAssignVendor()
   const complete = useCompleteMaintenance()
@@ -86,7 +89,7 @@ function VendorAssignment({ request }) {
       )}
 
       {request.status === 'RESOLVED' && request.cost != null && (
-        <p className="text-xs text-gray-500">Completed at a cost of {formatCurrency(request.cost)}{request.vendorNotes ? ` — ${request.vendorNotes}` : ''}</p>
+        <p className="text-xs text-gray-500">Completed at a cost of {formatCurrency(request.cost, currency)}{request.vendorNotes ? ` — ${request.vendorNotes}` : ''}</p>
       )}
 
       {request.vendorId && request.status !== 'RESOLVED' && (

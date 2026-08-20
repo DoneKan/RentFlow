@@ -4,6 +4,7 @@ import toast from 'react-hot-toast'
 import {
   useProspects, useUpdateProspectStage, useUpdateProspectScreening, useConvertProspect, useDeleteProspect,
 } from '../../hooks/useProspects'
+import { useAuth } from '../../context/AuthContext'
 import { formatDate, formatCurrency } from '../../utils/formatters'
 import StatusBadge from '../../components/ui/StatusBadge'
 import DataTable from '../../components/ui/DataTable'
@@ -170,6 +171,8 @@ function ProspectDetailModal({ prospect, onClose }) {
 }
 
 export default function ProspectsPage() {
+  const { user } = useAuth()
+  const currency = user?.organization?.currency || 'UGX'
   const [filters, setFilters] = useState({ stage: '' })
   const [showAdd, setShowAdd] = useState(false)
   const [selected, setSelected] = useState(null)
@@ -195,7 +198,7 @@ export default function ProspectsPage() {
     {
       key: 'monthlyIncome',
       label: 'Income',
-      render: (v) => <span className="text-sm">{v ? formatCurrency(v) : '—'}</span>,
+      render: (v) => <span className="text-sm">{v ? formatCurrency(v, currency) : '—'}</span>,
     },
     { key: 'createdAt', label: 'Added', render: (v) => <span className="text-sm text-gray-500">{formatDate(v)}</span> },
     {

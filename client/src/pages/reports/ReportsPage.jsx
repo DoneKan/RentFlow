@@ -19,6 +19,7 @@ import PageHeader from '../../components/ui/PageHeader'
 import StatCard from '../../components/ui/StatCard'
 import DataTable from '../../components/ui/DataTable'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
+import { useAuth } from '../../context/AuthContext'
 import { getFinancialOverview, getFinancialByProperty, exportReport, exportFullData } from '../../services/report.service'
 import { formatCurrency } from '../../utils/formatters'
 
@@ -73,6 +74,8 @@ function resolvePreset(preset) {
 }
 
 export default function ReportsPage() {
+  const { user } = useAuth()
+  const currency = user?.organization?.currency || 'UGX'
   const [tab, setTab] = useState('overview')
   const [preset, setPreset] = useState('this-month')
   const [exporting, setExporting] = useState(false)
@@ -199,10 +202,10 @@ export default function ReportsPage() {
       ),
     },
     { key: 'invoicesRaised', label: 'Invoices', sortable: true },
-    { key: 'revenue', label: 'Revenue', sortable: true, render: (v) => <span className="font-semibold text-green-700">{formatCurrency(v)}</span> },
-    { key: 'expenses', label: 'Expenses', sortable: true, render: (v) => <span className="font-medium text-red-600">{formatCurrency(v)}</span> },
-    { key: 'outstanding', label: 'Outstanding', sortable: true, render: (v) => <span className={v > 0 ? 'text-orange-600 font-medium' : 'text-gray-400'}>{formatCurrency(v)}</span> },
-    { key: 'netIncome', label: 'Net Income', sortable: true, render: (v) => <span className={`font-semibold ${v >= 0 ? 'text-gray-900' : 'text-red-600'}`}>{formatCurrency(v)}</span> },
+    { key: 'revenue', label: 'Revenue', sortable: true, render: (v) => <span className="font-semibold text-green-700">{formatCurrency(v, currency)}</span> },
+    { key: 'expenses', label: 'Expenses', sortable: true, render: (v) => <span className="font-medium text-red-600">{formatCurrency(v, currency)}</span> },
+    { key: 'outstanding', label: 'Outstanding', sortable: true, render: (v) => <span className={v > 0 ? 'text-orange-600 font-medium' : 'text-gray-400'}>{formatCurrency(v, currency)}</span> },
+    { key: 'netIncome', label: 'Net Income', sortable: true, render: (v) => <span className={`font-semibold ${v >= 0 ? 'text-gray-900' : 'text-red-600'}`}>{formatCurrency(v, currency)}</span> },
     { key: 'margin', label: 'Margin', sortable: true, render: (v) => <span className="text-gray-600">{v}%</span> },
   ]
 
@@ -276,27 +279,27 @@ export default function ReportsPage() {
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               <StatCard
                 title="Revenue Collected"
-                value={formatCurrency(overview?.revenue?.total || 0)}
+                value={formatCurrency(overview?.revenue?.total || 0, currency)}
                 icon={TrendingUp}
                 colorClass="bg-green-500"
                 subtitle={`${overview?.revenue?.count || 0} payments`}
               />
               <StatCard
                 title="Outstanding"
-                value={formatCurrency(overview?.outstanding?.total || 0)}
+                value={formatCurrency(overview?.outstanding?.total || 0, currency)}
                 icon={AlertCircle}
                 colorClass="bg-orange-500"
                 subtitle={`${overview?.outstanding?.count || 0} unpaid invoices`}
               />
               <StatCard
                 title="Total Expenses"
-                value={formatCurrency(overview?.expenses?.total || 0)}
+                value={formatCurrency(overview?.expenses?.total || 0, currency)}
                 icon={Receipt}
                 colorClass="bg-red-500"
               />
               <StatCard
                 title="Net Income"
-                value={formatCurrency(overview?.netIncome || 0)}
+                value={formatCurrency(overview?.netIncome || 0, currency)}
                 icon={overview?.netIncome >= 0 ? DollarSign : TrendingDown}
                 colorClass={overview?.netIncome >= 0 ? 'bg-brand' : 'bg-red-500'}
                 subtitle={`${overview?.collectionRate ?? 0}% collection rate`}
@@ -311,7 +314,7 @@ export default function ReportsPage() {
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                     <XAxis dataKey="month" tick={{ fontSize: 12 }} />
                     <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}K`} />
-                    <Tooltip formatter={(v) => formatCurrency(v)} />
+                    <Tooltip formatter={(v) => formatCurrency(v, currency)} />
                     <Legend />
                     <Bar dataKey="revenue" fill="#1e3a5f" name="Revenue" radius={[4, 4, 0, 0]} />
                     <Bar dataKey="expenses" fill="#ef4444" name="Expenses" radius={[4, 4, 0, 0]} />
@@ -329,7 +332,7 @@ export default function ReportsPage() {
                       <Pie data={pieData} cx="50%" cy="50%" outerRadius={80} dataKey="value" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
                         {pieData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
                       </Pie>
-                      <Tooltip formatter={(v) => formatCurrency(v)} />
+                      <Tooltip formatter={(v) => formatCurrency(v, currency)} />
                     </PieChart>
                   </ResponsiveContainer>
                 )}
@@ -342,8 +345,8 @@ export default function ReportsPage() {
                 <h3 className="text-sm font-semibold text-gray-700">Collection Health</h3>
               </div>
               <p className="text-sm text-gray-500">
-                Of {formatCurrency(overview?.invoiced?.total || 0)} invoiced this period, {formatCurrency(overview?.revenue?.total || 0)} has
-                been collected ({overview?.collectionRate ?? 0}%), leaving {formatCurrency(overview?.outstanding?.total || 0)} outstanding
+                Of {formatCurrency(overview?.invoiced?.total || 0, currency)} invoiced this period, {formatCurrency(overview?.revenue?.total || 0, currency)} has
+                been collected ({overview?.collectionRate ?? 0}%), leaving {formatCurrency(overview?.outstanding?.total || 0, currency)} outstanding
                 across {overview?.outstanding?.count || 0} invoice(s).
               </p>
             </div>
@@ -356,11 +359,11 @@ export default function ReportsPage() {
           <>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               <StatCard title="Properties" value={byProperty?.properties?.length || 0} icon={Building2} colorClass="bg-indigo-500" />
-              <StatCard title="Total Revenue" value={formatCurrency(byProperty?.totals?.revenue || 0)} icon={TrendingUp} colorClass="bg-green-500" />
-              <StatCard title="Total Expenses" value={formatCurrency(byProperty?.totals?.expenses || 0)} icon={Receipt} colorClass="bg-red-500" />
+              <StatCard title="Total Revenue" value={formatCurrency(byProperty?.totals?.revenue || 0, currency)} icon={TrendingUp} colorClass="bg-green-500" />
+              <StatCard title="Total Expenses" value={formatCurrency(byProperty?.totals?.expenses || 0, currency)} icon={Receipt} colorClass="bg-red-500" />
               <StatCard
                 title="Net Income"
-                value={formatCurrency(byProperty?.totals?.netIncome || 0)}
+                value={formatCurrency(byProperty?.totals?.netIncome || 0, currency)}
                 icon={DollarSign}
                 colorClass="bg-brand"
                 subtitle={`${byProperty?.totals?.margin ?? 0}% margin`}

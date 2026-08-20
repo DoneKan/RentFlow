@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Building2, MapPin, Pencil, Plus, UserPlus, Wrench, Trash2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useProperty, usePropertyUnits, useDeleteProperty } from '../../hooks/useProperties'
+import { useAuth } from '../../context/AuthContext'
 import { formatCurrency } from '../../utils/formatters'
 import StatusBadge from '../../components/ui/StatusBadge'
 import DataTable from '../../components/ui/DataTable'
@@ -28,6 +29,8 @@ const PRIORITY_COLORS = {
 }
 
 export default function PropertyDetailPage() {
+  const { user } = useAuth()
+  const currency = user?.organization?.currency || 'UGX'
   const { id } = useParams()
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('Units')
@@ -55,7 +58,7 @@ export default function PropertyDetailPage() {
   const unitCols = [
     { key: 'unitNumber', label: 'Unit #', render: (v) => <span className="font-medium">#{v}</span> },
     { key: 'type', label: 'Type' },
-    { key: 'rentAmount', label: 'Rent', render: (v) => formatCurrency(v) },
+    { key: 'rentAmount', label: 'Rent', render: (v, row) => formatCurrency(v, row.currency || currency) },
     { key: 'status', label: 'Status', render: (v) => <StatusBadge status={v} /> },
     {
       key: 'tenancy',
@@ -104,7 +107,7 @@ export default function PropertyDetailPage() {
     { key: 'unit', label: 'Unit', render: (_, row) => row.unit ? `Unit #${row.unit.unitNumber}` : <span className="text-gray-400">Whole property</span> },
     { key: 'category', label: 'Category', render: (v) => v.replace(/_/g, ' ') },
     { key: 'description', label: 'Description' },
-    { key: 'amount', label: 'Amount', render: (v) => formatCurrency(v) },
+    { key: 'amount', label: 'Amount', render: (v, row) => formatCurrency(v, row.currency || currency) },
     { key: 'vendor', label: 'Vendor' },
   ]
 
@@ -186,7 +189,7 @@ export default function PropertyDetailPage() {
               { label: 'Total Units', value: units.length },
               { label: 'Occupied', value: units.filter((u) => u.status === 'OCCUPIED').length, color: 'text-green-600' },
               { label: 'Vacant', value: units.filter((u) => u.status === 'VACANT').length, color: 'text-orange-500' },
-              { label: 'Monthly Revenue', value: formatCurrency(property.monthlyRevenue || 0), color: 'text-brand' },
+              { label: 'Monthly Revenue', value: formatCurrency(property.monthlyRevenue || 0, currency), color: 'text-brand' },
             ].map(({ label, value, color }) => (
               <div key={label} className="card py-4">
                 <p className="text-xs text-gray-500">{label}</p>
@@ -269,7 +272,7 @@ export default function PropertyDetailPage() {
                   {formatDate(t.startDate)} — {t.endDate ? formatDate(t.endDate) : 'present'}
                 </p>
               </div>
-              <span className="text-sm text-gray-600">{formatCurrency(t.rentAmount)}</span>
+              <span className="text-sm text-gray-600">{formatCurrency(t.rentAmount, currency)}</span>
             </div>
           ))}
         </div>

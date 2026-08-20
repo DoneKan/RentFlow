@@ -28,6 +28,11 @@ function normalizeKey(propertyId, unitNumber) {
 // used only to produce a helpful "did you mean" hint — never to silently
 // resolve a near-miss as if it were the intended match.
 async function prefetchContext(prisma, organizationId) {
+  const organization = await prisma.organization.findUnique({
+    where: { id: organizationId },
+    select: { currency: true },
+  });
+
   const properties = await prisma.property.findMany({
     where: { organizationId, isActive: true },
     select: { id: true, name: true, code: true },
@@ -43,7 +48,7 @@ async function prefetchContext(prisma, organizationId) {
     caseInsensitiveByName.get(lower).push(p);
   }
 
-  return { exactByName, caseInsensitiveByName };
+  return { exactByName, caseInsensitiveByName, orgCurrency: organization.currency };
 }
 
 // Parses "Water=20000;Garbage=5000" into { Water: 20000, Garbage: 5000 }.
@@ -163,6 +168,8 @@ function validateRow(fields, context) {
     normalized.additionalCharges = charges;
   }
 
+  normalized.currency = context.orgCurrency;
+
   return { normalized, errors };
 }
 
@@ -218,6 +225,7 @@ async function commitRow(tx, organizationId, userId, normalized) {
       bathrooms: normalized.bathrooms,
       squareMeters: normalized.squareMeters,
       rentAmount: normalized.rentAmount,
+      currency: normalized.currency,
       additionalCharges: JSON.stringify(normalized.additionalCharges),
       paymentPeriod: normalized.paymentPeriod,
       status: 'VACANT',

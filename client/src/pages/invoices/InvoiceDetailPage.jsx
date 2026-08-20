@@ -84,7 +84,7 @@ export default function InvoiceDetailPage() {
         <div className="mb-4 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
           <span>
-            This tenant had <strong>{formatCurrency(priorUnpaid)}</strong> outstanding from a previous invoice when this draft was generated.
+            This tenant had <strong>{formatCurrency(priorUnpaid, invoice.currency)}</strong> outstanding from a previous invoice when this draft was generated.
           </span>
         </div>
       )}
@@ -140,14 +140,14 @@ export default function InvoiceDetailPage() {
                 {items.map((item, i) => (
                   <tr key={i}>
                     <td className="py-3 text-sm text-gray-700">{item.description}</td>
-                    <td className="py-3 text-sm text-right font-medium">{formatCurrency(item.amount)}</td>
+                    <td className="py-3 text-sm text-right font-medium">{formatCurrency(item.amount, invoice.currency)}</td>
                   </tr>
                 ))}
               </tbody>
               <tfoot>
                 <tr className="border-t-2 border-gray-200">
                   <td className="py-3 font-bold text-gray-900">Total</td>
-                  <td className="py-3 font-bold text-right text-brand text-lg">{formatCurrency(invoice.amount)}</td>
+                  <td className="py-3 font-bold text-right text-brand text-lg">{formatCurrency(invoice.amount, invoice.currency)}</td>
                 </tr>
               </tfoot>
             </table>
@@ -160,7 +160,7 @@ export default function InvoiceDetailPage() {
               {invoice.latePenalty > 0 && (
                 <div>
                   <p className="text-gray-500">Late Penalty</p>
-                  <p className="font-semibold text-red-500">{formatCurrency(invoice.latePenalty)}</p>
+                  <p className="font-semibold text-red-500">{formatCurrency(invoice.latePenalty, invoice.currency)}</p>
                 </div>
               )}
               {invoice.sentAt && (
@@ -196,7 +196,7 @@ export default function InvoiceDetailPage() {
                       <p className="text-xs text-gray-500">{p.method?.replace(/_/g, ' ')} · {formatDate(p.paidAt)}</p>
                     </div>
                     <StatusBadge status={p.status} />
-                    <span className="font-semibold text-sm">{formatCurrency(p.amount)}</span>
+                    <span className="font-semibold text-sm">{formatCurrency(p.amount, p.currency || invoice.currency)}</span>
                   </div>
                 ))}
               </div>
@@ -235,12 +235,12 @@ export default function InvoiceDetailPage() {
 
           <div className="card text-sm space-y-2">
             <h3 className="font-semibold text-gray-900 mb-2">Summary</h3>
-            <div className="flex justify-between"><span className="text-gray-500">Amount</span><span className="font-medium">{formatCurrency(invoice.amount)}</span></div>
+            <div className="flex justify-between"><span className="text-gray-500">Amount</span><span className="font-medium">{formatCurrency(invoice.amount, invoice.currency)}</span></div>
             {amountPaid > 0 && (
-              <div className="flex justify-between"><span className="text-gray-500">Paid</span><span className="font-medium text-green-600">{formatCurrency(amountPaid)}</span></div>
+              <div className="flex justify-between"><span className="text-gray-500">Paid</span><span className="font-medium text-green-600">{formatCurrency(amountPaid, invoice.currency)}</span></div>
             )}
             {invoice.status !== 'PAID' && invoice.status !== 'CANCELLED' && (
-              <div className="flex justify-between"><span className="text-gray-500">Balance Due</span><span className="font-semibold text-red-600">{formatCurrency(balanceDue)}</span></div>
+              <div className="flex justify-between"><span className="text-gray-500">Balance Due</span><span className="font-semibold text-red-600">{formatCurrency(balanceDue, invoice.currency)}</span></div>
             )}
             <div className="flex justify-between"><span className="text-gray-500">Status</span><StatusBadge status={invoice.status} /></div>
             <div className="flex justify-between"><span className="text-gray-500">Due</span><span>{formatDate(invoice.dueDate)}</span></div>

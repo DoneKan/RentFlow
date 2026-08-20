@@ -8,12 +8,15 @@ import ConfirmDialog from '../../components/ui/ConfirmDialog'
 import EmptyState from '../../components/ui/EmptyState'
 import LandlordExpenseReminderForm from '../../components/forms/LandlordExpenseReminderForm'
 import { useLandlordExpenseReminders, useDeleteLandlordExpenseReminder } from '../../hooks/useLandlordExpenseReminders'
+import { useAuth } from '../../context/AuthContext'
 import { formatCurrency, formatDate } from '../../utils/formatters'
 import { RECURRENCE_TYPES } from '../../utils/constants'
 
 const RECURRENCE_LABELS = Object.fromEntries(RECURRENCE_TYPES.map((t) => [t.value, t.label]))
 
 export default function ExpenseRemindersPage() {
+  const { user } = useAuth()
+  const currency = user?.organization?.currency || 'UGX'
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState(null)
   const [toDelete, setToDelete] = useState(null)
@@ -41,7 +44,7 @@ export default function ExpenseRemindersPage() {
       </div>
     ) },
     { key: 'property', label: 'Property', render: (p) => p?.name || <span className="text-gray-400">Whole business</span> },
-    { key: 'amount', label: 'Amount', render: (v) => formatCurrency(v) },
+    { key: 'amount', label: 'Amount', render: (v) => formatCurrency(v, currency) },
     { key: 'recurrenceType', label: 'Recurrence', render: (v, row) => v === 'CUSTOM' ? `Every ${row.customIntervalDays} days` : RECURRENCE_LABELS[v] || v },
     { key: 'nextDueDate', label: 'Next Due', render: (v) => formatDate(v) },
     { key: 'remindDaysBefore', label: 'Reminds', render: (v) => `${v} day${v === 1 ? '' : 's'} before` },

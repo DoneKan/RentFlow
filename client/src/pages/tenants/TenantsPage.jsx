@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Plus, Search, Users } from 'lucide-react'
 import { useTenants } from '../../hooks/useTenants'
 import { getProperties } from '../../services/property.service'
+import { useAuth } from '../../context/AuthContext'
 import { formatCurrency, formatDate } from '../../utils/formatters'
 import PageHeader from '../../components/ui/PageHeader'
 import DataTable from '../../components/ui/DataTable'
@@ -13,6 +14,8 @@ import AddTenantForm from '../../components/forms/AddTenantForm'
 import EmptyState from '../../components/ui/EmptyState'
 
 export default function TenantsPage() {
+  const { user } = useAuth()
+  const currency = user?.organization?.currency || 'UGX'
   const navigate = useNavigate()
   const [showAdd, setShowAdd] = useState(false)
   const [search, setSearch] = useState('')
@@ -68,7 +71,7 @@ export default function TenantsPage() {
     {
       key: 'rentAmount',
       label: 'Rent',
-      render: (v) => formatCurrency(v),
+      render: (v) => formatCurrency(v, currency),
     },
     {
       key: 'status',

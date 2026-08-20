@@ -9,6 +9,7 @@ import StatusBadge from '../../components/ui/StatusBadge'
 import Modal from '../../components/ui/Modal'
 import RecordPaymentForm from '../../components/forms/RecordPaymentForm'
 import { getPayments, downloadReceipt } from '../../services/payment.service'
+import { useAuth } from '../../context/AuthContext'
 import { formatCurrency, formatDateTime, getPaymentMethodLabel } from '../../utils/formatters'
 
 const METHOD_ICONS = {
@@ -19,6 +20,8 @@ const METHOD_ICONS = {
 }
 
 export default function PaymentsPage() {
+  const { user } = useAuth()
+  const currency = user?.organization?.currency || 'UGX'
   const [showForm, setShowForm] = useState(false)
   const [methodFilter, setMethodFilter] = useState('ALL')
   const [downloading, setDownloading] = useState(null)
@@ -66,7 +69,7 @@ export default function PaymentsPage() {
     },
     {
       key: 'amount', label: 'Amount',
-      render: (v) => <span className="font-bold text-gray-900">{formatCurrency(v)}</span>,
+      render: (v, row) => <span className="font-bold text-gray-900">{formatCurrency(v, row.currency || currency)}</span>,
     },
     {
       key: 'method', label: 'Method',
@@ -110,8 +113,8 @@ export default function PaymentsPage() {
       />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard title="Total Collected" value={formatCurrency(totalCollected)} icon={CreditCard} />
-        <StatCard title="MTN MoMo" value={formatCurrency(mtnTotal)} icon={Smartphone} color="yellow" />
+        <StatCard title="Total Collected" value={formatCurrency(totalCollected, currency)} icon={CreditCard} />
+        <StatCard title="MTN MoMo" value={formatCurrency(mtnTotal, currency)} icon={Smartphone} color="yellow" />
         <StatCard title="Transactions" value={completed.length} icon={Banknote} color="green" />
         <StatCard title="Pending" value={pending} icon={Wallet} color="orange" />
       </div>

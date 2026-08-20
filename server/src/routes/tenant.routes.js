@@ -6,6 +6,8 @@ const { validate } = require('../middleware/validate');
 
 const router = Router();
 
+const PAYMENT_PERIODS = ['MONTHLY', 'QUARTERLY', 'SEMI_ANNUAL', 'ANNUAL', 'CUSTOM'];
+
 const createSchema = Joi.object({
   name: Joi.string().min(2).max(100).required(),
   // Phone is the reliable channel for SMS (reminders, payment
@@ -19,6 +21,14 @@ const createSchema = Joi.object({
   endDate: Joi.date().allow(null),
   rentAmount: Joi.number().positive().allow(null),
   depositAmount: Joi.number().min(0).default(0),
+  // Optional — falls back to the unit's own default payment period
+  // server-side when omitted (e.g. from older/other callers).
+  paymentPeriod: Joi.string().valid(...PAYMENT_PERIODS).allow(null),
+  customIntervalMonths: Joi.number().integer().positive().when('paymentPeriod', {
+    is: 'CUSTOM',
+    then: Joi.required(),
+    otherwise: Joi.allow(null),
+  }),
   notes: Joi.string().allow('', null),
 });
 

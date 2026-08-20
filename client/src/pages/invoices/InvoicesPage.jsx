@@ -53,7 +53,7 @@ export default function InvoicesPage() {
     { key: 'invoiceNumber', label: 'Invoice #', render: (v) => <span className="font-mono text-xs font-medium">{v}</span> },
     { key: 'tenant', label: 'Tenant', render: (t) => <span className="font-medium">{t?.name || '—'}</span> },
     { key: 'unit', label: 'Property / Unit', render: (u, row) => <span className="text-gray-600">{row.property?.name} · #{u?.unitNumber}</span> },
-    { key: 'amount', label: 'Amount', render: (v) => <span className="font-semibold">{formatCurrency(v)}</span> },
+    { key: 'amount', label: 'Amount', render: (v, row) => <span className="font-semibold">{formatCurrency(v, row.currency)}</span> },
     {
       key: 'payments', label: 'Balance Due',
       render: (payments, row) => {
@@ -61,8 +61,8 @@ export default function InvoicesPage() {
         const paid = (payments || []).reduce((sum, p) => sum + Number(p.amount), 0)
         const balance = Math.max(Number(row.amount) - paid, 0)
         return balance < Number(row.amount)
-          ? <span className="font-semibold text-red-600">{formatCurrency(balance)}</span>
-          : <span className="text-gray-500">{formatCurrency(balance)}</span>
+          ? <span className="font-semibold text-red-600">{formatCurrency(balance, row.currency)}</span>
+          : <span className="text-gray-500">{formatCurrency(balance, row.currency)}</span>
       },
     },
     { key: 'dueDate', label: 'Due Date', render: (v) => formatDate(v) },
@@ -85,7 +85,7 @@ export default function InvoicesPage() {
             )}
             {priorUnpaid > 0 && (
               <span
-                title={`Tenant has ${formatCurrency(priorUnpaid)} outstanding from a previous invoice`}
+                title={`Tenant has ${formatCurrency(priorUnpaid, row.currency)} outstanding from a previous invoice`}
                 className="inline-flex items-center gap-1 text-xs font-medium text-red-600"
               >
                 <AlertTriangle className="h-3.5 w-3.5" /> Behind

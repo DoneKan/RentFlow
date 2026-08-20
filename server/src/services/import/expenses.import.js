@@ -27,6 +27,11 @@ function normalizeKey(propertyId, dateIso, amount, category) {
 }
 
 async function prefetchContext(prisma, organizationId) {
+  const organization = await prisma.organization.findUnique({
+    where: { id: organizationId },
+    select: { currency: true },
+  });
+
   const properties = await prisma.property.findMany({
     where: { organizationId, isActive: true },
     select: { id: true, name: true, code: true },
@@ -58,7 +63,7 @@ async function prefetchContext(prisma, organizationId) {
     idx.caseInsensitiveByNumber.get(lower).push(u);
   }
 
-  return { propertyIndex: { exactByName, caseInsensitiveByName }, unitsByProperty };
+  return { propertyIndex: { exactByName, caseInsensitiveByName }, unitsByProperty, orgCurrency: organization.currency };
 }
 
 function validateRow(fields, context) {
@@ -139,6 +144,7 @@ function validateRow(fields, context) {
   }
 
   normalized.vendor = fields.vendor.trim() || null;
+  normalized.currency = context.orgCurrency;
 
   return { normalized, errors };
 }
@@ -193,6 +199,7 @@ async function commitRow(tx, organizationId, userId, normalized) {
       unitId: normalized.unitId,
       category: normalized.category,
       amount: normalized.amount,
+      currency: normalized.currency,
       description: normalized.description,
       date: normalized.date,
       vendor: normalized.vendor,

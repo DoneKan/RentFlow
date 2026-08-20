@@ -4,13 +4,15 @@ import { Plus, X } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useCreateBudget } from '../../hooks/useBudgets'
 import { getProperties } from '../../services/property.service'
+import { useAuth } from '../../context/AuthContext'
 import NumberInput from '../ui/NumberInput'
 
 const CATEGORIES = ['RENTAL_INCOME', 'UTILITIES', 'SECURITY', 'MAINTENANCE', 'KCCA_TAX', 'URA_TAX', 'REPAIRS', 'INSURANCE', 'LAND_ACQUISITION', 'CONSTRUCTION', 'OTHER']
 
 export default function AddBudgetForm({ onClose }) {
+  const { user } = useAuth()
   const create = useCreateBudget()
-  const [form, setForm] = useState({ propertyId: '', name: '', periodStart: '', periodEnd: '', currency: 'UGX' })
+  const [form, setForm] = useState({ propertyId: '', name: '', periodStart: '', periodEnd: '', currency: user?.organization?.currency || 'UGX' })
   const [lines, setLines] = useState([{ category: 'RENTAL_INCOME', plannedAmount: '', notes: '' }])
 
   const { data: properties } = useQuery({

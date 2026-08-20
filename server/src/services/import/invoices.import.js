@@ -86,7 +86,7 @@ async function prefetchContext(prisma, organizationId) {
   const units = await prisma.unit.findMany({
     where: { property: { organizationId } },
     select: {
-      id: true, unitNumber: true, propertyId: true, rentAmount: true, additionalCharges: true, type: true,
+      id: true, unitNumber: true, propertyId: true, rentAmount: true, additionalCharges: true, type: true, currency: true,
       tenancies: {
         where: { status: 'ACTIVE' },
         select: { id: true, rentAmount: true, tenant: { select: { id: true, email: true, name: true } } },
@@ -167,7 +167,7 @@ function validateRow(fields, context) {
     normalized.unitId = unit.id;
     normalized.propertyId = property.id;
     normalized.tenantId = tenancy.tenant.id;
-    normalized.unit = { type: unit.type, unitNumber: unit.unitNumber, additionalCharges: unit.additionalCharges };
+    normalized.unit = { type: unit.type, unitNumber: unit.unitNumber, additionalCharges: unit.additionalCharges, currency: unit.currency };
     normalized.tenancyRentAmount = tenancy.rentAmount;
   }
 
@@ -305,6 +305,7 @@ async function commitRow(tx, organizationId, userId, normalized) {
       propertyId: normalized.propertyId,
       tenantId: normalized.tenantId,
       amount: total,
+      currency: normalized.unit.currency,
       dueDate: normalized.dueDate,
       items: JSON.stringify(items),
       latePenalty: normalized.latePenalty,

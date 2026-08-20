@@ -53,7 +53,7 @@ async function prefetchContext(prisma, organizationId) {
 
   const units = await prisma.unit.findMany({
     where: { property: { organizationId } },
-    select: { id: true, unitNumber: true, propertyId: true, rentAmount: true, status: true },
+    select: { id: true, unitNumber: true, propertyId: true, rentAmount: true, paymentPeriod: true, status: true },
   });
   // Units are indexed per-property (not globally) since unit numbers are
   // only unique within a property — "1" under Property A is unrelated to
@@ -139,6 +139,7 @@ function validateRow(fields, context, rowNumber) {
     normalized.unitId = unit.id;
     normalized.propertyId = property.id;
     normalized.unitRentAmount = unit.rentAmount;
+    normalized.unitPaymentPeriod = unit.paymentPeriod;
   }
 
   const tenantName = fields.tenantName.trim();
@@ -288,6 +289,10 @@ async function commitRow(tx, organizationId, userId, normalized) {
       notes: normalized.notes,
       tenantName: normalized.tenantName,
       tenantPhone: normalized.tenantPhone,
+      // CSV import has no payment-period column of its own — inherit the
+      // unit's default, same as it always effectively did before this was
+      // a per-tenancy field.
+      paymentPeriod: normalized.unitPaymentPeriod,
     },
   });
 

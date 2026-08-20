@@ -110,7 +110,7 @@ export default function RecordPaymentForm({ onClose, defaultTenancyId, defaultIn
               <option value="">Select invoice…</option>
               {invoicesData.map((inv) => (
                 <option key={inv.id} value={inv.id}>
-                  {inv.invoiceNumber} — {formatCurrency(inv.amount)} (due {formatDate(inv.dueDate)})
+                  {inv.invoiceNumber} — {formatCurrency(inv.amount, inv.currency)} (due {formatDate(inv.dueDate)})
                 </option>
               ))}
             </select>
@@ -123,7 +123,7 @@ export default function RecordPaymentForm({ onClose, defaultTenancyId, defaultIn
         <NumberInput
           value={form.amount}
           onChange={(v) => set('amount', v)}
-          placeholder={selectedInvoice ? `Invoice: ${formatCurrency(selectedInvoice.amount)}` : '0'}
+          placeholder={selectedInvoice ? `Invoice: ${formatCurrency(selectedInvoice.amount, selectedInvoice.currency)}` : '0'}
           required
         />
       </div>

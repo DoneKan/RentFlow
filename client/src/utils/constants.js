@@ -36,9 +36,10 @@ export const PROPERTY_TYPES = [
 
 export const PAYMENT_PERIODS = [
   { value: 'MONTHLY', label: 'Monthly' },
-  { value: 'QUARTERLY', label: 'Quarterly (4 months)' },
+  { value: 'QUARTERLY', label: 'Quarterly (3 months)' },
   { value: 'SEMI_ANNUAL', label: 'Semi-Annual (6 months)' },
   { value: 'ANNUAL', label: 'Annual (1 year)' },
+  { value: 'CUSTOM', label: 'Custom interval' },
 ]
 
 export const RECURRENCE_TYPES = [

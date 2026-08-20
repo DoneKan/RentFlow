@@ -487,13 +487,17 @@ async function exportReport(req, res, next) {
 
     await syncEndedTenancies(orgId);
 
+    const organization = await prisma.organization.findUnique({ where: { id: orgId }, select: { currency: true } });
+    const currency = organization.currency;
+
     if (type === 'overall') {
       const data = await computeOverview(orgId, start, end);
       const rows = [
         ['RentFlow — Overall Financial Report'],
         [`Period: ${start.toLocaleDateString('en-UG')} to ${end.toLocaleDateString('en-UG')}`],
+        [`Currency: ${currency}`],
         [],
-        ['Metric', 'Amount'],
+        ['Metric', `Amount (${currency})`],
         ['Revenue Collected', data.revenue.total],
         ['Total Invoiced', data.invoiced.total],
         ['Outstanding Balance', data.outstanding.total],
@@ -501,7 +505,7 @@ async function exportReport(req, res, next) {
         ['Total Expenses', data.expenses.total],
         ['Net Income', data.netIncome],
         [],
-        ['Expenses by Category', 'Amount', 'Count'],
+        ['Expenses by Category', `Amount (${currency})`, 'Count'],
         ...data.expenses.byCategory.map((e) => [e.category, e.amount, e.count]),
         [],
         ['6-Month Trend', 'Revenue', 'Expenses', 'Net Income'],
@@ -518,8 +522,9 @@ async function exportReport(req, res, next) {
       const rows = [
         ['RentFlow — Financial Report by Property'],
         [`Period: ${start.toLocaleDateString('en-UG')} to ${end.toLocaleDateString('en-UG')}`],
+        [`Currency: ${currency}`],
         [],
-        ['Property', 'Code', 'Units', 'Occupied', 'Occupancy %', 'Invoices Raised', 'Revenue', 'Expenses', 'Outstanding', 'Net Income', 'Margin %'],
+        ['Property', 'Code', 'Units', 'Occupied', 'Occupancy %', 'Invoices Raised', `Revenue (${currency})`, `Expenses (${currency})`, `Outstanding (${currency})`, `Net Income (${currency})`, 'Margin %'],
         ...data.properties.map((p) => [
           p.propertyName, p.propertyCode, p.totalUnits, p.occupiedUnits, p.occupancyRate,
           p.invoicesRaised, p.revenue, p.expenses, p.outstanding, p.netIncome, p.margin,
@@ -562,7 +567,9 @@ async function exportReport(req, res, next) {
     applyTenantDisplayAll(payments, 'invoice.tenancy');
 
     const rows = [
-      ['Receipt No', 'Date', 'Tenant', 'Property', 'Unit', 'Invoice', 'Amount', 'Method'],
+      [`Currency: ${currency}`],
+      [],
+      ['Receipt No', 'Date', 'Tenant', 'Property', 'Unit', 'Invoice', `Amount (${currency})`, 'Method'],
       ...payments.map((p) => [
         p.receiptNumber,
         p.paidAt ? new Date(p.paidAt).toLocaleDateString('en-UG') : '',
@@ -600,6 +607,9 @@ async function exportFullData(req, res, next) {
     const { start, end } = resolveRange(req.query);
 
     await syncEndedTenancies(orgId);
+
+    const organization = await prisma.organization.findUnique({ where: { id: orgId }, select: { currency: true } });
+    const currency = organization.currency;
 
     const [tenancies, payments, invoices, expenses] = await Promise.all([
       prisma.tenancy.findMany({
@@ -663,8 +673,8 @@ async function exportFullData(req, res, next) {
       { header: 'Email', key: 'email', width: 28 },
       { header: 'Property', key: 'property', width: 22 },
       { header: 'Unit', key: 'unit', width: 10 },
-      { header: 'Rent Amount', key: 'rent', width: 14 },
-      { header: 'Deposit', key: 'deposit', width: 14 },
+      { header: `Rent Amount (${currency})`, key: 'rent', width: 14 },
+      { header: `Deposit (${currency})`, key: 'deposit', width: 14 },
       { header: 'Status', key: 'status', width: 12 },
       { header: 'Move-in Date', key: 'startDate', width: 14 },
       { header: 'Move-out Date', key: 'endDate', width: 14 },
@@ -695,7 +705,7 @@ async function exportFullData(req, res, next) {
       { header: 'Property', key: 'property', width: 22 },
       { header: 'Unit', key: 'unit', width: 10 },
       { header: 'Invoice No', key: 'invoiceNumber', width: 18 },
-      { header: 'Amount', key: 'amount', width: 14 },
+      { header: `Amount (${currency})`, key: 'amount', width: 14 },
       { header: 'Method', key: 'method', width: 14 },
     ];
     for (const p of payments) {
@@ -719,9 +729,9 @@ async function exportFullData(req, res, next) {
       { header: 'Tenant', key: 'tenant', width: 24 },
       { header: 'Property', key: 'property', width: 22 },
       { header: 'Unit', key: 'unit', width: 10 },
-      { header: 'Amount', key: 'amount', width: 14 },
-      { header: 'Paid', key: 'paid', width: 14 },
-      { header: 'Balance Due', key: 'balance', width: 14 },
+      { header: `Amount (${currency})`, key: 'amount', width: 14 },
+      { header: `Paid (${currency})`, key: 'paid', width: 14 },
+      { header: `Balance Due (${currency})`, key: 'balance', width: 14 },
       { header: 'Status', key: 'status', width: 12 },
       { header: 'Due Date', key: 'dueDate', width: 14 },
     ];
@@ -747,7 +757,7 @@ async function exportFullData(req, res, next) {
       { header: 'Date', key: 'date', width: 14 },
       { header: 'Property', key: 'property', width: 22 },
       { header: 'Category', key: 'category', width: 18 },
-      { header: 'Amount', key: 'amount', width: 14 },
+      { header: `Amount (${currency})`, key: 'amount', width: 14 },
       { header: 'Vendor', key: 'vendor', width: 20 },
       { header: 'Description', key: 'description', width: 30 },
     ];

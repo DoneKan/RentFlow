@@ -22,11 +22,15 @@ function addMonthsFromAnchor(anchorDate, months) {
   return target;
 }
 
-function periodMonths(paymentPeriod) {
+function periodMonths(paymentPeriod, customIntervalMonths) {
   switch (paymentPeriod) {
     case 'QUARTERLY': return 3;
     case 'SEMI_ANNUAL': return 6;
     case 'ANNUAL': return 12;
+    // Falls back to 1 (monthly) if a CUSTOM tenancy somehow has no interval
+    // set — same defensive default as every other unrecognized value here,
+    // rather than producing a 0-month (infinite-loop) period.
+    case 'CUSTOM': return customIntervalMonths > 0 ? customIntervalMonths : 1;
     default: return 1;
   }
 }
@@ -102,6 +106,7 @@ async function createDraftForPeriod(tenancy, dueDate, billingPeriod) {
         propertyId: tenancy.propertyId,
         tenantId: tenancy.tenantId,
         amount: total,
+        currency: unit.currency,
         dueDate,
         items: JSON.stringify(items),
         status: 'DRAFT',
@@ -154,7 +159,11 @@ async function processAutoInvoicing() {
     });
 
     for (const tenancy of activeTenancies) {
-      const months = periodMonths(tenancy.unit.paymentPeriod);
+      // Per-tenancy snapshot (Tenancy.paymentPeriod), not the unit's own
+      // paymentPeriod — same reasoning as tenantName/tenantPhone/rentAmount:
+      // a later edit to the unit's default must not retroactively change
+      // the billing cadence of a tenancy that's already running.
+      const months = periodMonths(tenancy.paymentPeriod, tenancy.customIntervalMonths);
 
       let periodIndex = 0;
       let dueDate = new Date(tenancy.startDate);

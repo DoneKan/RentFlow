@@ -1,6 +1,6 @@
 import { format, formatDistanceToNow } from 'date-fns'
 
-export function formatCurrency(amount, currency = 'USD') {
+export function formatCurrency(amount, currency = 'UGX') {
   if (amount === null || amount === undefined) return `${currency} 0`
   const num = typeof amount === 'string' ? parseFloat(amount) : amount
   const decimals = currency === 'USD' || currency === 'EUR' || currency === 'GBP' ? 2 : 0

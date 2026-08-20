@@ -1,12 +1,15 @@
 import { useState } from 'react'
 import { AlertTriangle, CheckCircle2 } from 'lucide-react'
 import { useJournalEntries, useTrialBalance } from '../../hooks/useLedger'
+import { useAuth } from '../../context/AuthContext'
 import { formatCurrency, formatDate } from '../../utils/formatters'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 
 const TABS = ['Journal Entries', 'Trial Balance']
 
 function JournalEntriesTab() {
+  const { user } = useAuth()
+  const currency = user?.organization?.currency || 'UGX'
   const { data, isLoading } = useJournalEntries({ limit: 50 })
   const entries = data?.data || []
 
@@ -26,8 +29,8 @@ function JournalEntriesTab() {
               {entry.lines.map((line) => (
                 <tr key={line.id} className="border-t border-gray-50">
                   <td className="py-1.5 text-gray-600">{line.account.code} — {line.account.name}</td>
-                  <td className="py-1.5 text-right w-28">{Number(line.debit) > 0 ? formatCurrency(line.debit) : ''}</td>
-                  <td className="py-1.5 text-right w-28 text-gray-500">{Number(line.credit) > 0 ? formatCurrency(line.credit) : ''}</td>
+                  <td className="py-1.5 text-right w-28">{Number(line.debit) > 0 ? formatCurrency(line.debit, currency) : ''}</td>
+                  <td className="py-1.5 text-right w-28 text-gray-500">{Number(line.credit) > 0 ? formatCurrency(line.credit, currency) : ''}</td>
                 </tr>
               ))}
             </tbody>
@@ -39,6 +42,8 @@ function JournalEntriesTab() {
 }
 
 function TrialBalanceTab() {
+  const { user } = useAuth()
+  const currency = user?.organization?.currency || 'UGX'
   const { data, isLoading } = useTrialBalance()
 
   if (isLoading) return <LoadingSpinner />
@@ -66,17 +71,17 @@ function TrialBalanceTab() {
             {data.rows.map((r) => (
               <tr key={r.account.id}>
                 <td className="px-4 py-3 text-sm text-gray-700">{r.account.code} — {r.account.name}</td>
-                <td className="px-4 py-3 text-sm">{formatCurrency(r.debit)}</td>
-                <td className="px-4 py-3 text-sm">{formatCurrency(r.credit)}</td>
-                <td className="px-4 py-3 text-sm font-medium">{formatCurrency(r.balance)}</td>
+                <td className="px-4 py-3 text-sm">{formatCurrency(r.debit, currency)}</td>
+                <td className="px-4 py-3 text-sm">{formatCurrency(r.credit, currency)}</td>
+                <td className="px-4 py-3 text-sm font-medium">{formatCurrency(r.balance, currency)}</td>
               </tr>
             ))}
           </tbody>
           <tfoot className="bg-gray-50">
             <tr>
               <td className="px-4 py-3 text-sm font-semibold text-gray-700">Total</td>
-              <td className="px-4 py-3 text-sm font-semibold">{formatCurrency(data.totals.debit)}</td>
-              <td className="px-4 py-3 text-sm font-semibold">{formatCurrency(data.totals.credit)}</td>
+              <td className="px-4 py-3 text-sm font-semibold">{formatCurrency(data.totals.debit, currency)}</td>
+              <td className="px-4 py-3 text-sm font-semibold">{formatCurrency(data.totals.credit, currency)}</td>
               <td />
             </tr>
           </tfoot>

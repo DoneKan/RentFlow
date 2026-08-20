@@ -6,12 +6,15 @@ import { useCreateTenant } from '../../hooks/useTenants'
 import NumberInput from '../ui/NumberInput'
 import { getProperties } from '../../services/property.service'
 import { getPropertyUnits } from '../../services/property.service'
+import { useAuth } from '../../context/AuthContext'
 import { PAYMENT_PERIODS } from '../../utils/constants'
 import { formatCurrency } from '../../utils/formatters'
 
 const STEPS = ['Personal Info', 'Unit Assignment', 'Tenancy Terms']
 
 export default function AddTenantForm({ onClose, defaultPropertyId, defaultName, defaultEmail, defaultPhone, onSuccess }) {
+  const { user } = useAuth()
+  const orgCurrency = user?.organization?.currency || 'UGX'
   const create = useCreateTenant()
   const [step, setStep] = useState(0)
   const [form, setForm] = useState({
@@ -23,6 +26,7 @@ export default function AddTenantForm({ onClose, defaultPropertyId, defaultName,
     rentAmount: '',
     depositAmount: '',
     paymentPeriod: 'MONTHLY',
+    customIntervalMonths: '',
     lateFeeType: 'PERCENT',
     lateFeePercent: '10',
     lateFeeFixed: '',
@@ -62,6 +66,10 @@ export default function AddTenantForm({ onClose, defaultPropertyId, defaultName,
       if (!form.propertyId || !form.unitId) { toast.error('Please select a property and unit'); return false }
     } else if (step === 2) {
       if (!form.startDate || !form.rentAmount) { toast.error('Start date and rent amount are required'); return false }
+      if (form.paymentPeriod === 'CUSTOM' && !form.customIntervalMonths) {
+        toast.error('Enter how many months the custom payment interval repeats every')
+        return false
+      }
       if (!form.termsAgreed) { toast.error('Please agree to the tenancy terms to proceed'); return false }
     }
     return true
@@ -91,6 +99,8 @@ export default function AddTenantForm({ onClose, defaultPropertyId, defaultName,
         endDate: form.endDate || undefined,
         rentAmount: parseFloat(form.rentAmount),
         depositAmount: form.depositAmount ? parseFloat(form.depositAmount) : 0,
+        paymentPeriod: form.paymentPeriod,
+        customIntervalMonths: form.paymentPeriod === 'CUSTOM' ? parseInt(form.customIntervalMonths) : undefined,
         notes,
       })
       toast.success('Tenant added successfully!')
@@ -165,7 +175,7 @@ export default function AddTenantForm({ onClose, defaultPropertyId, defaultName,
                           <p className="text-sm font-medium text-gray-900">Unit {unit.unitNumber}</p>
                           <p className="text-xs text-gray-500">{unit.type} · Floor {unit.floor ?? 'G'}</p>
                         </div>
-                        <p className="text-sm font-semibold text-brand">{formatCurrency(unit.rentAmount)}</p>
+                        <p className="text-sm font-semibold text-brand">{formatCurrency(unit.rentAmount, unit.currency || orgCurrency)}</p>
                       </label>
                     ))}
                   </div>
@@ -198,14 +208,27 @@ export default function AddTenantForm({ onClose, defaultPropertyId, defaultName,
                 <NumberInput value={form.depositAmount} onChange={(v) => set('depositAmount', v)} placeholder="0" />
               </div>
             </div>
-            <div>
-              <label className="label">Payment period</label>
-              <input
-                value={PAYMENT_PERIODS.find((p) => p.value === form.paymentPeriod)?.label || form.paymentPeriod}
-                className="input bg-gray-50 text-gray-500"
-                disabled
-                title="Set on the unit — edit the unit to change its payment period"
-              />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="label">Payment period *</label>
+                <select value={form.paymentPeriod} onChange={(e) => set('paymentPeriod', e.target.value)} className="input">
+                  {PAYMENT_PERIODS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+                </select>
+                <p className="text-xs text-gray-400 mt-1">Defaults to the unit's own period — override just for this tenant if needed.</p>
+              </div>
+              {form.paymentPeriod === 'CUSTOM' && (
+                <div>
+                  <label className="label">Repeat every (months) *</label>
+                  <input
+                    type="number" min="1" max="60"
+                    value={form.customIntervalMonths}
+                    onChange={(e) => set('customIntervalMonths', e.target.value)}
+                    className="input"
+                    placeholder="e.g. 2"
+                    required
+                  />
+                </div>
+              )}
             </div>
 
             <div className="border-t border-gray-100 pt-4">

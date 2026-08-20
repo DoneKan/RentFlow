@@ -94,6 +94,7 @@ async function create(req, res, next) {
 
     const property = await prisma.property.findFirst({
       where: { id: propertyId, organizationId: req.user.organizationId },
+      include: { organization: { select: { currency: true } } },
     });
     if (!property) throw ApiError.notFound('Property not found');
 
@@ -108,6 +109,7 @@ async function create(req, res, next) {
         unitId: unitId || null,
         category: category || 'OTHER',
         amount,
+        currency: property.organization.currency,
         description,
         date: new Date(date),
         vendor,

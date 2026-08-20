@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Plus, Phone, Mail } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useVendors, useVendorHistory, useUpdateVendor, useDeleteVendor } from '../../hooks/useVendors'
+import { useAuth } from '../../context/AuthContext'
 import { formatDate, formatCurrency } from '../../utils/formatters'
 import StatusBadge from '../../components/ui/StatusBadge'
 import DataTable from '../../components/ui/DataTable'
@@ -11,6 +12,8 @@ import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import AddVendorForm from '../../components/forms/AddVendorForm'
 
 function VendorDetailModal({ vendor, onClose }) {
+  const { user } = useAuth()
+  const currency = user?.organization?.currency || 'UGX'
   const { data: history, isLoading } = useVendorHistory(vendor.id)
   const update = useUpdateVendor()
 
@@ -53,7 +56,7 @@ function VendorDetailModal({ vendor, onClose }) {
                   </div>
                   <div className="text-right flex flex-col items-end gap-1">
                     <StatusBadge status={r.status} />
-                    {r.cost != null && <span className="text-xs text-gray-500">{formatCurrency(r.cost)}</span>}
+                    {r.cost != null && <span className="text-xs text-gray-500">{formatCurrency(r.cost, currency)}</span>}
                   </div>
                 </div>
               ))}

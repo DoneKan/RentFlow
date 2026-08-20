@@ -4,11 +4,14 @@ import toast from 'react-hot-toast'
 import { useQuery } from '@tanstack/react-query'
 import { useCreateInvoice, useUpdateInvoice } from '../../hooks/useInvoices'
 import { getTenants, getTenant } from '../../services/tenant.service'
+import { useAuth } from '../../context/AuthContext'
 import { formatCurrency } from '../../utils/formatters'
 import { addDays, format } from 'date-fns'
 import NumberInput from '../ui/NumberInput'
 
 export default function GenerateInvoiceForm({ onClose, defaultTenantId, invoice }) {
+  const { user } = useAuth()
+  const orgCurrency = user?.organization?.currency || 'UGX'
   const isEditing = !!invoice
   const create = useCreateInvoice()
   const update = useUpdateInvoice()
@@ -154,7 +157,7 @@ export default function GenerateInvoiceForm({ onClose, defaultTenantId, invoice 
             ))}
           </div>
           <div className="mt-2 flex justify-end">
-            <span className="text-sm font-semibold text-gray-900">Total: {formatCurrency(total)}</span>
+            <span className="text-sm font-semibold text-gray-900">Total: {formatCurrency(total, invoice?.currency || tenancyData?.unit?.currency || orgCurrency)}</span>
           </div>
         </div>
       )}

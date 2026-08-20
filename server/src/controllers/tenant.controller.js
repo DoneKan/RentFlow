@@ -64,6 +64,8 @@ async function create(req, res, next) {
       endDate,
       rentAmount,
       depositAmount,
+      paymentPeriod,
+      customIntervalMonths,
       notes,
     } = req.body;
 
@@ -123,6 +125,13 @@ async function create(req, res, next) {
           notes,
           tenantName: name,
           tenantPhone: phone,
+          // Per-tenancy snapshot, same reasoning as tenantName/tenantPhone
+          // and rentAmount above — the unit's own paymentPeriod is only the
+          // default at assignment time, not something later unit edits
+          // should silently reach back and change for an already-billing
+          // tenancy.
+          paymentPeriod: paymentPeriod || unit.paymentPeriod,
+          customIntervalMonths: paymentPeriod === 'CUSTOM' ? customIntervalMonths : null,
         },
       });
 

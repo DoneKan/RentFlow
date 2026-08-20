@@ -34,6 +34,7 @@ export default function DashboardPage() {
   const navigate = useNavigate()
   const sendReminder = useSendReminder()
   const [propertyId, setPropertyId] = useState('')
+  const currency = user?.organization?.currency || 'UGX'
 
   const { data: propertiesList } = useQuery({
     queryKey: ['properties', 'all'],
@@ -150,14 +151,14 @@ export default function DashboardPage() {
         />
         <StatCard
           title="Revenue This Month"
-          value={formatCurrency(stats.monthlyRevenue ?? 0)}
+          value={formatCurrency(stats.monthlyRevenue ?? 0, currency)}
           icon={TrendingUp}
           colorClass="bg-indigo-500"
           subtitle="Collected payments"
         />
         <StatCard
           title="Outstanding"
-          value={formatCurrency(stats.outstanding ?? 0)}
+          value={formatCurrency(stats.outstanding ?? 0, currency)}
           icon={AlertCircle}
           colorClass="bg-orange-500"
           subtitle={`${stats.overdueCount ?? 0} overdue invoices`}
@@ -209,7 +210,7 @@ export default function DashboardPage() {
                 <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
                 <XAxis dataKey="month" tick={{ fontSize: 11 }} />
                 <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `${(v / 1000000).toFixed(1)}M`} />
-                <Tooltip formatter={(v) => formatCurrency(v)} />
+                <Tooltip formatter={(v) => formatCurrency(v, currency)} />
                 <Legend />
                 <Bar dataKey="revenue" name="Revenue" fill="#1e3a5f" radius={[4, 4, 0, 0]} />
                 <Bar dataKey="expenses" name="Expenses" fill="#f97316" radius={[4, 4, 0, 0]} />
@@ -244,7 +245,7 @@ export default function DashboardPage() {
                     <p className="text-xs text-gray-500">{p.invoice?.unit?.unitNumber} · {getPaymentMethodLabel(p.method)}</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm font-semibold text-gray-900">{formatCurrency(p.amount)}</p>
+                    <p className="text-sm font-semibold text-gray-900">{formatCurrency(p.amount, currency)}</p>
                     <p className="text-xs text-gray-400">{formatDate(p.paidAt)}</p>
                   </div>
                 </div>
@@ -277,7 +278,7 @@ export default function DashboardPage() {
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <p className="text-sm font-semibold text-gray-900">{formatCurrency(balanceDue)}</p>
+                    <p className="text-sm font-semibold text-gray-900">{formatCurrency(balanceDue, currency)}</p>
                     <button
                       onClick={() => handleSendReminder(inv.id)}
                       title="Send reminder"

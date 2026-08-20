@@ -5,7 +5,9 @@ import toast from 'react-hot-toast'
 import { useTenant, useTerminateTenant } from '../../hooks/useTenants'
 import { useInvoices, useSendReminder } from '../../hooks/useInvoices'
 import { usePayments } from '../../hooks/usePayments'
+import { useAuth } from '../../context/AuthContext'
 import { formatCurrency, formatDate, getInitials } from '../../utils/formatters'
+import { PAYMENT_PERIODS } from '../../utils/constants'
 import StatusBadge from '../../components/ui/StatusBadge'
 import DataTable from '../../components/ui/DataTable'
 import Modal from '../../components/ui/Modal'
@@ -18,6 +20,8 @@ import LoadingSpinner from '../../components/ui/LoadingSpinner'
 const TABS = ['Overview', 'Invoices', 'Payments']
 
 export default function TenantDetailPage() {
+  const { user } = useAuth()
+  const orgCurrency = user?.organization?.currency || 'UGX'
   const { id } = useParams()
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('Overview')
@@ -54,7 +58,7 @@ export default function TenantDetailPage() {
 
   const invoiceCols = [
     { key: 'invoiceNumber', label: 'Invoice #', render: (v) => <span className="font-mono text-xs">{v}</span> },
-    { key: 'amount', label: 'Amount', render: (v) => formatCurrency(v) },
+    { key: 'amount', label: 'Amount', render: (v, row) => formatCurrency(v, row.currency || orgCurrency) },
     { key: 'dueDate', label: 'Due Date', render: (v) => formatDate(v) },
     { key: 'status', label: 'Status', render: (v) => <StatusBadge status={v} /> },
     {
@@ -78,7 +82,7 @@ export default function TenantDetailPage() {
 
   const paymentCols = [
     { key: 'receiptNumber', label: 'Receipt #', render: (v) => <span className="font-mono text-xs">{v}</span> },
-    { key: 'amount', label: 'Amount', render: (v) => formatCurrency(v) },
+    { key: 'amount', label: 'Amount', render: (v, row) => formatCurrency(v, row.currency || orgCurrency) },
     { key: 'method', label: 'Method', render: (v) => v?.replace(/_/g, ' ') },
     { key: 'status', label: 'Status', render: (v) => <StatusBadge status={v} /> },
     { key: 'paidAt', label: 'Date', render: (v) => formatDate(v) },
@@ -130,7 +134,7 @@ export default function TenantDetailPage() {
               </div>
               <div>
                 <p className="text-gray-500">Rent Amount</p>
-                <p className="font-semibold text-brand mt-0.5">{formatCurrency(tenancy.rentAmount)}</p>
+                <p className="font-semibold text-brand mt-0.5">{formatCurrency(tenancy.rentAmount, orgCurrency)}</p>
               </div>
               <div>
                 <p className="text-gray-500">Move-in Date</p>
@@ -142,11 +146,15 @@ export default function TenantDetailPage() {
               </div>
               <div>
                 <p className="text-gray-500">Payment Period</p>
-                <p className="font-medium mt-0.5">{tenancy.unit?.paymentPeriod}</p>
+                <p className="font-medium mt-0.5">
+                  {tenancy.paymentPeriod === 'CUSTOM'
+                    ? `Every ${tenancy.customIntervalMonths} month${tenancy.customIntervalMonths === 1 ? '' : 's'}`
+                    : PAYMENT_PERIODS.find((p) => p.value === tenancy.paymentPeriod)?.label || tenancy.paymentPeriod}
+                </p>
               </div>
               <div>
                 <p className="text-gray-500">Deposit</p>
-                <p className="font-medium mt-0.5">{formatCurrency(tenancy.depositAmount)}</p>
+                <p className="font-medium mt-0.5">{formatCurrency(tenancy.depositAmount, orgCurrency)}</p>
               </div>
               <div>
                 <p className="text-gray-500">Status</p>
